@@ -1,18 +1,241 @@
 @import "tailwindcss";
 
+/*
+ * Ditto design tokens.
+ *
+ * Dark is the default and the demo mode; light is supported and applied via
+ * [data-theme='light'] on <html>. Colour is never decorative here — it always
+ * carries one of four meanings:
+ *
+ *   danger  🔴  a proven semantic conflict
+ *   warn    🟡  a near-duplicate, or output we predicted but did not execute
+ *   success 🟢  healthy, or output we really executed
+ *   ai      🤖  suspected AI-reinvented
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --canvas: #08090a;
+  --panel: #0c0d0f;
+  --inset: #101114;
+  --line: #1a1c1f;
+  --line-strong: #292c31;
+
+  --ink: #e8eaed;
+  --ink-muted: #9096a0;
+  --ink-subtle: #61666e;
+
+  --accent: #6e79d6;
+  --accent-ink: #ffffff;
+  --accent-bg: #161a33;
+  --accent-line: #2f3872;
+
+  --danger: #f2555a;
+  --danger-bg: #2a1214;
+  --danger-line: #5c2126;
+
+  --warn: #f5a524;
+  --warn-bg: #291d0b;
+  --warn-line: #56390f;
+
+  --success: #3dd68c;
+  --success-bg: #0d2119;
+  --success-line: #1c4534;
+
+  --ai: #a97bea;
+  --ai-bg: #1e1428;
+  --ai-line: #3d2657;
+
+  /* syntax highlighting */
+  --code-keyword: #c47bea;
+  --code-fn: #7aa2f7;
+  --code-string: #7fcf95;
+  --code-number: #f0a868;
+  --code-comment: #5b616b;
+  --code-type: #5ec8d8;
+  --code-regex: #e5a3c0;
+  --code-punc: #868d97;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #ffffff;
+  --panel: #fbfbfc;
+  --inset: #f5f6f8;
+  --line: #e4e6ea;
+  --line-strong: #d0d4da;
+
+  --ink: #15171a;
+  --ink-muted: #5c626b;
+  --ink-subtle: #878d96;
+
+  --accent: #4f5bc4;
+  --accent-ink: #ffffff;
+  --accent-bg: #eff0fb;
+  --accent-line: #c8ccf0;
+
+  --danger: #cf2c33;
+  --danger-bg: #fdf0f0;
+  --danger-line: #f2c2c4;
+
+  --warn: #8f5a00;
+  --warn-bg: #fdf6e6;
+  --warn-line: #eeddaa;
+
+  --success: #0f7a4f;
+  --success-bg: #ecf8f1;
+  --success-line: #b5e0c9;
+
+  --ai: #7534c2;
+  --ai-bg: #f7f1fd;
+  --ai-line: #dfcbf5;
+
+  --code-keyword: #9333c4;
+  --code-fn: #2b5bd7;
+  --code-string: #1a7f45;
+  --code-number: #b45309;
+  --code-comment: #8b919b;
+  --code-type: #0e7490;
+  --code-regex: #b83280;
+  --code-punc: #6b717a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-inset: var(--inset);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-line: var(--accent-line);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-line: var(--danger-line);
+
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
+
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-line: var(--success-line);
+
+  --color-ai: var(--ai);
+  --color-ai-bg: var(--ai-bg);
+  --color-ai-line: var(--ai-line);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --animate-conflict-pulse: conflict-pulse 2.4s ease-in-out infinite;
+  --animate-rise: rise 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-drawer-in: drawer-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 180ms ease-out both;
+}
+
+@keyframes conflict-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px var(--danger-line);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px var(--danger);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  /* Dense over airy — a judge should feel this tool knows a lot. */
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Tabular figures wherever numbers are compared down a column. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-subtle);
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
