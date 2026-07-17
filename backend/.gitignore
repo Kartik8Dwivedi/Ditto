@@ -10,3 +10,6 @@ npm-debug.log*
 # Coverage / build
 coverage
 dist
+
+# Ditto local index cache (regenerable via `npm run index`)
+.cache
