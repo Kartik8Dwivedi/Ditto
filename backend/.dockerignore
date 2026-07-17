@@ -1,0 +1,25 @@
+# Never ship these into the build context / image.
+node_modules
+dist
+coverage
+
+# Local state and secrets — must not leak into an image.
+.env
+.env.*
+*.local
+.cache
+
+# Tests and their config are not needed to run the server.
+tests
+vitest.config.ts
+tsconfig.typecheck.json
+
+# VCS, editor, and docs noise.
+.git
+.gitignore
+.github
+*.log
+*.md
+.prettierrc.json
+.prettierignore
+eslint.config.js

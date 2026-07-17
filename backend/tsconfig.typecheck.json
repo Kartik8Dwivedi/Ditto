@@ -1,0 +1,10 @@
+{
+  /* Typecheck the tests too. The build (tsconfig.json) stays src-only so tests
+     never reach dist. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+}

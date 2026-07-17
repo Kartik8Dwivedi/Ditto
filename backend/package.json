@@ -8,7 +8,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "index": "tsx src/Scripts/index-repo.ts",
+    "pipeline": "tsx src/Scripts/pipeline.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -27,6 +31,10 @@
     "http-status-codes": "^2.3.0",
     "mongoose": "^8.17.1",
     "morgan": "^1.10.0",
+    "openai": "^6.48.0",
+    "p-limit": "^7.3.0",
+    "tar-stream": "^3.2.0",
+    "ts-morph": "^28.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,12 +44,14 @@
     "@types/express": "^4.17.21",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.10.5",
+    "@types/tar-stream": "^3.1.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^9.1.0",
     "globals": "^15.14.0",
     "prettier": "^3.4.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.10"
   }
 }

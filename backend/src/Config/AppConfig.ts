@@ -16,6 +16,17 @@ const envSchema = z.object({
   MONGO_URI: z.string().min(1, 'MONGO_URI is required'),
   // Comma-separated list of allowed CORS origins; "*" allows all.
   CORS_ORIGIN: z.string().default('*'),
+
+  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
+  // Model ids move faster than any codebase. They live here, never in service
+  // code: a "model not found" 404 is an env value to change, not a code change.
+  // Both verified against OpenAI's docs on 2026-07-17.
+  OPENAI_MODEL_CHEAP: z.string().min(1).default('gpt-5.4-nano'),
+  OPENAI_MODEL_FLAGSHIP: z.string().min(1).default('gpt-5.6-terra'),
+  EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
+  OPENAI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  // Only used by the local indexer to raise GitHub's anonymous rate limit.
+  GITHUB_TOKEN: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -37,6 +48,12 @@ const AppConfig = Object.freeze({
   PORT: env.PORT,
   MONGO_URI: env.MONGO_URI,
   CORS_ORIGIN: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+  OPENAI_API_KEY: env.OPENAI_API_KEY,
+  OPENAI_MODEL_CHEAP: env.OPENAI_MODEL_CHEAP,
+  OPENAI_MODEL_FLAGSHIP: env.OPENAI_MODEL_FLAGSHIP,
+  EMBEDDING_MODEL: env.EMBEDDING_MODEL,
+  OPENAI_TIMEOUT_MS: env.OPENAI_TIMEOUT_MS,
+  GITHUB_TOKEN: env.GITHUB_TOKEN,
   RateLimiter,
 });
 
