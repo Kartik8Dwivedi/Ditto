@@ -4,50 +4,67 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, LoaderCircle, Search, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
-import type { RepoSummary } from '@/types/ditto';
+import { analyzeRepo, DittoApiError } from '@/services/ditto.api';
+import { parseGitHubRepo } from '@/lib/github';
 import { cn } from '@/lib/utils';
 
 /**
- * The paste path.
+ * The paste path — on-demand analysis (docs/ONDEMAND.md).
  *
- * Ditto's API (PRD §2) exposes indexed repositories — there is no endpoint that
- * analyses an arbitrary URL on demand, and this input does not pretend there
- * is. A repo we have not indexed gets told so plainly. The alternative — a
- * convincing progress bar that lands on somebody else's analysis — is exactly
- * the kind of thing a judge is invited to catch.
+ * Validate the URL locally for instant feedback, then POST /analyze. The backend
+ * either dedups (returns a repoId → straight to the map) or queues a job
+ * (returns a jobId → the live progress view). The hero buttons below remain the
+ * instant, primary path; this box is the "bring your own repo" path.
  */
-export function RepoPicker({ repos }: { repos: RepoSummary[] }) {
+export function RepoPicker() {
   const router = useRouter();
   const [value, setValue] = useState('');
-  const [notIndexed, setNotIndexed] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const resolve = (input: string): RepoSummary | undefined => {
-    const cleaned = input
-      .trim()
-      .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
-      .replace(/\.git$/i, '')
-      .replace(/^\/+|\/+$/g, '')
-      .toLowerCase();
-    return repos.find((r) => `${r.owner}/${r.name}`.toLowerCase() === cleaned);
-  };
-
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
+
     const query = value.trim();
     if (query === '') return;
 
-    const match = resolve(query);
-    if (!match) {
-      setNotIndexed(query);
-      toast.error('Not indexed yet', {
-        description: `Ditto has not analysed ${query}. Pick one of the indexed repositories below.`,
-      });
+    // Client-side gate: reject anything that is not a GitHub repo before we ask
+    // the backend, so the feedback is immediate and specific.
+    const ref = parseGitHubRepo(query);
+    if (!ref) {
+      setError(
+        'That does not look like a public GitHub repository. Paste a github.com URL or owner/name.',
+      );
       return;
     }
-    setNotIndexed(null);
-    startTransition(() => router.push(`/repo/${match.id}`));
+    setError(null);
+
+    try {
+      const { jobId, repoId } = await analyzeRepo(query);
+      if (repoId) {
+        // Dedup hit — already analysed. Go straight to the map.
+        startTransition(() => router.push(`/repo/${repoId}`));
+      } else if (jobId) {
+        // New analysis queued — watch it run.
+        const slug = `${ref.owner}/${ref.name}`;
+        startTransition(() =>
+          router.push(`/analyze/${jobId}?repo=${encodeURIComponent(slug)}`),
+        );
+      } else {
+        setError('The analysis service returned an unexpected response. Please try again.');
+      }
+    } catch (err) {
+      const message =
+        err instanceof DittoApiError
+          ? err.message
+          : 'Could not start the analysis. Please try again.';
+      setError(message);
+      toast.error('Could not analyse that repo', { description: message });
+    }
   };
+
+  const busy = isPending;
 
   return (
     <div className="w-full">
@@ -61,30 +78,33 @@ export function RepoPicker({ repos }: { repos: RepoSummary[] }) {
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
-              setNotIndexed(null);
+              if (error) setError(null);
             }}
             spellCheck={false}
             autoComplete="off"
-            placeholder="Paste a public GitHub repo — owner/name"
-            aria-label="GitHub repository"
+            autoCapitalize="off"
+            placeholder="Paste a public GitHub repo — https://github.com/owner/name"
+            aria-label="GitHub repository URL"
+            aria-invalid={error !== null}
+            disabled={busy}
             className={cn(
               'h-9 w-full rounded-md border bg-panel pr-3 pl-9 font-mono text-[13px] text-ink',
               'placeholder:text-ink-subtle',
-              'transition-colors duration-150 focus:outline-none',
-              notIndexed ? 'border-warn-line' : 'border-line-strong focus:border-accent',
+              'transition-colors duration-150 focus:outline-none disabled:opacity-60',
+              error ? 'border-danger-line focus:border-danger' : 'border-line-strong focus:border-accent',
             )}
           />
         </div>
         <button
           type="submit"
-          disabled={isPending || value.trim() === ''}
+          disabled={busy || value.trim() === ''}
           className={cn(
             'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3',
             'bg-accent font-mono text-[13px] font-medium text-accent-ink',
             'transition-opacity duration-150 hover:opacity-90 disabled:opacity-40',
           )}
         >
-          {isPending ? (
+          {busy ? (
             <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
           ) : (
             <ArrowRight aria-hidden className="size-3.5" />
@@ -93,15 +113,13 @@ export function RepoPicker({ repos }: { repos: RepoSummary[] }) {
         </button>
       </form>
 
-      {notIndexed && (
-        <p className="animate-fade-in mt-2 flex items-start gap-2 rounded-md border border-warn-line bg-warn-bg/50 px-3 py-2 text-[12px] leading-relaxed text-ink-muted">
-          <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0 text-warn" />
-          <span>
-            <span className="font-mono text-ink">{notIndexed}</span> is not indexed. Ditto analyses a
-            repository ahead of time rather than on the spot — indexing a new one takes a few minutes
-            and a few rupees of model spend, so it is not wired to this box. The repositories below
-            are ready now.
-          </span>
+      {error && (
+        <p
+          role="alert"
+          className="animate-fade-in mt-2 flex items-start gap-2 rounded-md border border-danger-line bg-danger-bg/40 px-3 py-2 text-[12px] leading-relaxed text-ink-muted"
+        >
+          <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0 text-danger" />
+          <span>{error}</span>
         </p>
       )}
     </div>

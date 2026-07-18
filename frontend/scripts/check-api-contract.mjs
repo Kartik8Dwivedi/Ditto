@@ -60,7 +60,7 @@ function checkRepoSummary(r, path) {
 const STAT_KEYS = [
   'functions', 'files', 'modules', 'semanticDuplicateClusters', 'behavioralConflicts',
   'nearDuplicates', 'reusableUtilities', 'suspectedReinvented', 'linesRemovable',
-  'callSitesUnifiable', 'healthScore',
+  'callSitesUnifiable', 'healthScore', 'functionsTotal', 'functionsAnalyzed',
 ];
 
 function checkStats(s, path) {
@@ -68,6 +68,9 @@ function checkStats(s, path) {
   for (const k of STAT_KEYS) checkField(s, path, k, isNum, 'number');
   if (isNum(s.healthScore) && (s.healthScore < 0 || s.healthScore > 100)) {
     note(`${path}.healthScore`, `out of range 0-100: ${s.healthScore}`);
+  }
+  if (isNum(s.functionsAnalyzed) && isNum(s.functionsTotal) && s.functionsAnalyzed > s.functionsTotal) {
+    note(`${path}`, `functionsAnalyzed ${s.functionsAnalyzed} exceeds functionsTotal ${s.functionsTotal}`);
   }
 }
 

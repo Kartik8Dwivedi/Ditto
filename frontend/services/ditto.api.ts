@@ -20,8 +20,16 @@
  *   - The browser (the cluster drawer) goes through the same-origin proxy at
  *     app/api/ditto/[...path] so the backend's CORS config can never break it.
  */
-import type { ApiEnvelope, ClusterDetail, RepoDetail, RepoSummary } from '@/types/ditto';
+import type {
+  AnalyzeResponse,
+  ApiEnvelope,
+  ClusterDetail,
+  Job,
+  RepoDetail,
+  RepoSummary,
+} from '@/types/ditto';
 import { getMockCluster, getMockRepo, getMockRepos } from '@/lib/mocks';
+import { parseGitHubRepo } from '@/lib/github';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -62,13 +70,18 @@ function endpoint(path: string): string {
   return typeof window === 'undefined' ? `${API_BASE}/api/v1${path}` : `/api/ditto${path}`;
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, body?: unknown): Promise<T> {
   const url = endpoint(path);
+  const isPost = body !== undefined;
 
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { accept: 'application/json' },
+      method: isPost ? 'POST' : 'GET',
+      headers: isPost
+        ? { accept: 'application/json', 'content-type': 'application/json' }
+        : { accept: 'application/json' },
+      body: isPost ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     });
   } catch {
@@ -130,4 +143,42 @@ export async function fetchCluster(clusterId: string): Promise<ClusterDetail> {
     return cluster;
   }
   return request<ClusterDetail>(`/clusters/${encodeURIComponent(clusterId)}`);
+}
+
+/**
+ * POST /api/v1/analyze — kick off (or dedup) an on-demand analysis.
+ *
+ * Returns `{ jobId, repoId: null }` for a new queued analysis (poll the job),
+ * or `{ jobId: null, repoId }` when the repo was already analysed (navigate now).
+ * See docs/ONDEMAND.md.
+ */
+export async function analyzeRepo(repoUrl: string): Promise<AnalyzeResponse> {
+  if (SOURCE === 'mock') {
+    await sleep(MOCK_LATENCY_MS / 3);
+    // Offline dedup: a pasted URL for a repo we already ship as a fixture goes
+    // straight to its map. Anything else cannot be analysed without the backend,
+    // and we say so honestly rather than faking a progress bar to nowhere.
+    const ref = parseGitHubRepo(repoUrl);
+    if (ref) {
+      const match = getMockRepos().find(
+        (r) => r.owner.toLowerCase() === ref.owner.toLowerCase() && r.name.toLowerCase() === ref.name.toLowerCase(),
+      );
+      if (match) return { jobId: null, repoId: match.id };
+    }
+    throw new DittoApiError(
+      'Live on-demand analysis needs the Ditto backend running. Explore the pre-analysed repositories below, or point NEXT_PUBLIC_DITTO_SOURCE at the API.',
+      'bad_response',
+    );
+  }
+  return request<AnalyzeResponse>('/analyze', { repoUrl });
+}
+
+/** GET /api/v1/jobs/:jobId — poll an in-flight analysis. */
+export async function getJob(jobId: string): Promise<Job> {
+  if (SOURCE === 'mock') {
+    // Mock mode never hands out a jobId (analyzeRepo either dedups or throws),
+    // so reaching here means something is wrong — fail loudly rather than hang.
+    throw new DittoApiError('Job polling is not available without the backend.', 'not_found', 404);
+  }
+  return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
 }

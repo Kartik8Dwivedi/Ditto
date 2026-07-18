@@ -6,6 +6,7 @@ import { DittoScore } from '@/components/map/ditto-score';
 import { IntelligencePanel } from '@/components/map/intelligence-panel';
 import { JscpdStrip } from '@/components/map/jscpd-strip';
 import { RepoHeader } from '@/components/map/repo-header';
+import { TruncationNotice } from '@/components/map/truncation-notice';
 import { Database, ShieldAlert } from 'lucide-react';
 
 // Live backend data, rendered per request (never prerendered at build).
@@ -75,6 +76,9 @@ export default async function RepoPage(props: PageProps<'/repo/[repoId]'>) {
 
         {/* Main Content Area */}
         <main className="min-w-0 flex-1 space-y-6">
+          {/* Renders only when the live pipeline capped the analysis. */}
+          <TruncationNotice stats={stats} />
+
           <JscpdStrip stats={stats} />
 
           <section className="space-y-3">

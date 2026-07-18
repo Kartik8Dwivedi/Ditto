@@ -90,7 +90,7 @@ export default async function Home() {
           </p>
 
           <div className="w-full max-w-lg pt-4">
-            <RepoPicker repos={repos} />
+            <RepoPicker />
           </div>
         </section>
 
@@ -133,13 +133,13 @@ export default async function Home() {
                 Today, **over 80% of software engineers use AI coding tools** (Copilot, Cursor, Devin) daily. These tools write code extremely fast, but they have a fatal design flaw: **they operate as local optimizers**. Because models are context-constrained and rely on basic vector RAG lookup, they cannot examine your entire codebase before writing a line of code.
               </p>
               <p>
-                When an AI agent needs a simple date helper or string formatter, it doesn't search deep private subdirectories — it simply **re-implements the logic from scratch** under a different name in a new file.
+                When an AI agent needs a simple date helper or string formatter, it doesn&apos;t search deep private subdirectories — it simply **re-implements the logic from scratch** under a different name in a new file.
               </p>
               <div className="border-l-2 border-accent-line pl-3 py-1 bg-inset/50 rounded-r my-2">
                 <strong className="text-ink font-medium">The correctness cliff:</strong> Over months, you accumulate four functions doing the same job written completely differently. Standard CI accepts this because each copy passes its own file-level tests in isolation. But they behave slightly differently on edge cases, causing **silent behavioral drift** that breaks production.
               </div>
               <p>
-                Ditto acts as a persistent **Semantic Memory Layer**. Instead of letting slop compile, Ditto indexes your repository's behavioral intent, clusters clones, and proves where they diverge by executing them side-by-side.
+                Ditto acts as a persistent **Semantic Memory Layer**. Instead of letting slop compile, Ditto indexes your repository&apos;s behavioral intent, clusters clones, and proves where they diverge by executing them side-by-side.
               </p>
             </div>
           </div>
@@ -201,7 +201,7 @@ export default async function Home() {
         <section className="rounded-2xl border border-line bg-panel p-6 md:p-8 space-y-4">
           <div className="flex items-center gap-2.5">
             <span className="flex size-6 items-center justify-center rounded bg-inset border border-line-strong text-accent font-mono text-xs font-bold">i</span>
-            <h2 className="text-base font-bold text-ink">Why Ditto is Not an "AI Wrapper" or Bloat</h2>
+            <h2 className="text-base font-bold text-ink">Why Ditto is Not an &quot;AI Wrapper&quot; or Bloat</h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs md:text-[13px] leading-relaxed text-ink-muted">
@@ -218,7 +218,7 @@ export default async function Home() {
                 The heavy lifting—grouping functions, extracting code syntax, running isolates, and compiling diffs—uses **hard, deterministic algorithms**.
               </p>
               <p>
-                By executing the code in Node worker threads, we take the LLM out of the final verdict. When Ditto tells you a budget parser is broken, it's because **V8 ran the functions side-by-side and got different answers.**
+                By executing the code in Node worker threads, we take the LLM out of the final verdict. When Ditto tells you a budget parser is broken, it&apos;s because **V8 ran the functions side-by-side and got different answers.**
               </p>
             </div>
           </div>
@@ -318,7 +318,7 @@ export default async function Home() {
               </span>
               <h3 className="font-mono text-[13px] font-bold text-ink">Stage 3: MCP Agent Pre-flight</h3>
               <p className="text-[12px] leading-relaxed text-ink-muted">
-                Integrates into coding agents (Cursor, Devin) via the Model Context Protocol. Let agents query Ditto's index and reuse code *before* re-implementing.
+                Integrates into coding agents (Cursor, Devin) via the Model Context Protocol. Let agents query Ditto&apos;s index and reuse code *before* re-implementing.
               </p>
             </div>
           </div>

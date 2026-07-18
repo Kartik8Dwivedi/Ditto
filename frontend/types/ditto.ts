@@ -33,6 +33,14 @@ export type RepoStats = {
   callSitesUnifiable: number;
   /** 0-100 */
   healthScore: number;
+  /**
+   * Honest truncation signal (docs/ONDEMAND.md). The live pipeline caps how many
+   * functions it analyses; when it does, `functionsAnalyzed < functionsTotal`
+   * and the map shows a truncation note. For fully-analysed repos they are equal
+   * and no note appears. Never hardcode a cap — read these.
+   */
+  functionsTotal: number;
+  functionsAnalyzed: number;
 };
 
 /**
@@ -100,6 +108,54 @@ export type RepoDetail = {
   repo: RepoSummary;
   stats: RepoStats;
   clusters: ClusterSummary[];
+};
+
+/* ------------------------------------------------------------------ *
+ * On-demand analysis (docs/ONDEMAND.md).
+ *
+ * A pasted GitHub URL becomes a background Job. The frontend polls it and
+ * drives the pipeline stepper from `stage`, then navigates to `repoId` on done.
+ * ------------------------------------------------------------------ */
+
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed';
+
+/**
+ * Mirrors the PIPELINE_STAGES ids in `lib/constants.ts` (plus the two terminal
+ * meta-states) so the stepper can light up live from `job.stage`.
+ */
+export type JobStage =
+  | 'queued'
+  | 'fetch'
+  | 'parse'
+  | 'fingerprint'
+  | 'embed'
+  | 'cluster'
+  | 'adjudicate'
+  | 'probe'
+  | 'done';
+
+export type Job = {
+  id: string;
+  status: JobStatus;
+  stage: JobStage | null;
+  /** Set when done — the repo to navigate to. */
+  repoId: string | null;
+  /** Human-readable, set when failed. */
+  error: string | null;
+  /** Total functions the AST index found. */
+  functionsTotal: number | null;
+  /** How many were actually analysed (may be capped below the total). */
+  functionsAnalyzed: number | null;
+};
+
+/**
+ * Response of `POST /api/v1/analyze`. Exactly one of the two is set:
+ *   { jobId, repoId: null } — a new analysis was queued; poll the job.
+ *   { jobId: null, repoId } — dedup hit; this repo is already analysed, go now.
+ */
+export type AnalyzeResponse = {
+  jobId: string | null;
+  repoId: string | null;
 };
 
 /**

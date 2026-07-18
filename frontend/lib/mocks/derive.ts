@@ -8,15 +8,28 @@
  */
 import type { ClusterDetail, ClusterSummary, RepoStats } from '@/types/ditto';
 
-/** The parts of RepoStats that cannot be derived from the cluster list. */
+/**
+ * The parts of RepoStats that cannot be derived from the cluster list.
+ * `functionsTotal`/`functionsAnalyzed` are optional in the seed and default to
+ * `functions` — i.e. these fixtures represent fully-analysed repos, so the
+ * truncation note never shows for them.
+ */
 type StatsSeed = Omit<
   RepoStats,
-  'semanticDuplicateClusters' | 'behavioralConflicts' | 'linesRemovable'
->;
+  | 'semanticDuplicateClusters'
+  | 'behavioralConflicts'
+  | 'linesRemovable'
+  | 'functionsTotal'
+  | 'functionsAnalyzed'
+> &
+  Partial<Pick<RepoStats, 'functionsTotal' | 'functionsAnalyzed'>>;
 
 export function deriveStats(clusters: ClusterDetail[], seed: StatsSeed): RepoStats {
+  const { functionsTotal, functionsAnalyzed, ...rest } = seed;
   return {
-    ...seed,
+    ...rest,
+    functionsTotal: functionsTotal ?? seed.functions,
+    functionsAnalyzed: functionsAnalyzed ?? seed.functions,
     semanticDuplicateClusters: clusters.length,
     behavioralConflicts: clusters.filter((c) => c.hasProvenDivergence).length,
     linesRemovable: clusters.reduce((total, c) => total + c.linesRemovable, 0),

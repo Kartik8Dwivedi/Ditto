@@ -17,14 +17,23 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export async function GET(_req: NextRequest, ctx: RouteContext<'/api/ditto/[...path]'>) {
+async function forward(
+  req: NextRequest,
+  ctx: RouteContext<'/api/ditto/[...path]'>,
+): Promise<NextResponse> {
   const { path } = await ctx.params;
   const target = `${API_BASE}/api/v1/${path.map(encodeURIComponent).join('/')}`;
+  const isPost = req.method === 'POST';
 
   let upstream: Response;
   try {
     upstream = await fetch(target, {
-      headers: { accept: 'application/json' },
+      method: req.method,
+      headers: isPost
+        ? { accept: 'application/json', 'content-type': 'application/json' }
+        : { accept: 'application/json' },
+      // Read the body as text and hand it straight on — the proxy stays dumb.
+      body: isPost ? await req.text() : undefined,
       cache: 'no-store',
     });
   } catch {
@@ -42,3 +51,6 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/api/ditto/[...p
     headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
   });
 }
+
+export const GET = forward;
+export const POST = forward;
