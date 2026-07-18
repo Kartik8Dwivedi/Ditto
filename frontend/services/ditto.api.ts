@@ -70,22 +70,49 @@ function endpoint(path: string): string {
   return typeof window === 'undefined' ? `${API_BASE}/api/v1${path}` : `/api/ditto${path}`;
 }
 
+/**
+ * Cloud Run cold starts and scale-ups surface as a transient 502/503/504 or a
+ * dropped connection. Those are worth one more try; a 4xx never is.
+ */
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+const MAX_GET_ATTEMPTS = 3;
+const RETRY_BASE_MS = 400;
+
 async function request<T>(path: string, body?: unknown): Promise<T> {
   const url = endpoint(path);
   const isPost = body !== undefined;
 
   let response: Response;
-  try {
-    response = await fetch(url, {
-      method: isPost ? 'POST' : 'GET',
-      headers: isPost
-        ? { accept: 'application/json', 'content-type': 'application/json' }
-        : { accept: 'application/json' },
-      body: isPost ? JSON.stringify(body) : undefined,
-      cache: 'no-store',
-    });
-  } catch {
-    throw new DittoApiError(`Could not reach the Ditto API at ${API_BASE}.`, 'network');
+  let attempt = 0;
+
+  for (;;) {
+    attempt += 1;
+    // Only GETs are retried. POST /analyze is not idempotent — retrying it
+    // could queue a second (paid) analysis for the same repo.
+    const canRetry = !isPost && attempt < MAX_GET_ATTEMPTS;
+
+    try {
+      response = await fetch(url, {
+        method: isPost ? 'POST' : 'GET',
+        headers: isPost
+          ? { accept: 'application/json', 'content-type': 'application/json' }
+          : { accept: 'application/json' },
+        body: isPost ? JSON.stringify(body) : undefined,
+        cache: 'no-store',
+      });
+    } catch {
+      if (canRetry) {
+        await sleep(RETRY_BASE_MS * attempt);
+        continue;
+      }
+      throw new DittoApiError(`Could not reach the Ditto API at ${API_BASE}.`, 'network');
+    }
+
+    if (canRetry && TRANSIENT_STATUSES.has(response.status)) {
+      await sleep(RETRY_BASE_MS * attempt);
+      continue;
+    }
+    break;
   }
 
   if (response.status === 404) {

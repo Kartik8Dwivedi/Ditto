@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { fetchRepos } from '@/services/ditto.api';
+import { fetchRepo, fetchRepos } from '@/services/ditto.api';
+import { rankRepos, toRanked, type RankedRepo } from '@/lib/repo-ranking';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { HeroRepoButton } from '@/components/landing/hero-repo-button';
 import { RepoPicker } from '@/components/landing/repo-picker';
@@ -19,15 +21,30 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-const BLURBS: Record<string, string> = {
-  'cline-cline': 'Four functions named truncateText, one package, three different answers.',
-  'actualbudget-actual': 'Two ways to read (1,234.56). One says credit, one says debit.',
-  'ditto-labs-ditto': 'Ditto, analysed by Ditto — the duplicates our own agents wrote.',
+/**
+ * Curated one-liners, keyed by `owner/name` — repo ids are database ids and
+ * differ per environment, so keying on them silently fell back to a generic
+ * blurb for every card. Anything without a curated line gets an honest
+ * description generated from its own findings (see `blurbFor`).
+ */
+const CURATED_BLURBS: Record<string, string> = {
+  'cline/cline': 'Four functions named truncateText, one package, three different answers.',
 };
 
-export default async function Home() {
-  const repos = await fetchRepos();
+function blurbFor({ repo, stats, provenDivergences }: RankedRepo): string {
+  const curated = CURATED_BLURBS[`${repo.owner}/${repo.name}`.toLowerCase()];
+  if (curated) return curated;
+  if (!stats) return 'Indexed by Ditto.';
+  if (provenDivergences > 0) {
+    return `${provenDivergences} cluster${provenDivergences === 1 ? '' : 's'} executed and proven to disagree.`;
+  }
+  if (stats.semanticDuplicateClusters > 0) {
+    return `${stats.semanticDuplicateClusters} semantic clusters — none proven to disagree.`;
+  }
+  return 'No semantic duplicates found — nothing to consolidate.';
+}
 
+export default function Home() {
   return (
     <div className="relative min-h-screen w-full bg-canvas text-ink overflow-x-hidden">
       {/* Matrix dot-grid backdrop */}
@@ -102,15 +119,11 @@ export default async function Home() {
               Indexed Repositories (Verified Clones)
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {repos.map((repo) => (
-              <HeroRepoButton
-                key={repo.id}
-                repo={repo}
-                blurb={BLURBS[repo.id] ?? 'Indexed by Ditto.'}
-              />
-            ))}
-          </div>
+          {/* Streamed: the largest repo's detail endpoint takes ~8s, so the
+              cards arrive on their own without holding up the whole page. */}
+          <Suspense fallback={<RepoCardsSkeleton />}>
+            <IndexedRepos />
+          </Suspense>
         </section>
 
         {/* The AI Slop Problem Section */}
@@ -338,6 +351,52 @@ export default async function Home() {
           </div>
         </footer>
       </main>
+    </div>
+  );
+}
+
+/**
+ * Fetches every indexed repo's metrics on the SERVER, in parallel, then orders
+ * the cards by interestingness before they render.
+ *
+ * This has to happen server-side: the sort depends on stats, so the stats must
+ * be known before the list is laid out. It also fixes the card that used to
+ * fetch its own metrics on mount and lose the race — `Promise.allSettled` means
+ * one slow or failing repo degrades to a single metric-less card instead of
+ * taking the section down with it.
+ */
+async function IndexedRepos() {
+  const repos = await fetchRepos();
+  const settled = await Promise.allSettled(repos.map((repo) => fetchRepo(repo.id)));
+
+  const ranked = rankRepos(
+    repos.map((repo, i) => {
+      const result = settled[i];
+      if (result.status === 'fulfilled') return toRanked(result.value);
+      console.error(`[ditto] could not load stats for ${repo.owner}/${repo.name}`, result.reason);
+      return { repo, stats: null, provenDivergences: 0 };
+    }),
+  );
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {ranked.map((entry) => (
+        <HeroRepoButton key={entry.repo.id} {...entry} blurb={blurbFor(entry)} />
+      ))}
+    </div>
+  );
+}
+
+function RepoCardsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="rounded-xl border border-line bg-panel p-5">
+          <div className="h-5 w-44 animate-pulse rounded bg-inset" />
+          <div className="mt-2 h-4 w-60 animate-pulse rounded bg-inset" />
+          <div className="mt-6 h-4 w-full animate-pulse rounded bg-inset" />
+        </div>
+      ))}
     </div>
   );
 }
