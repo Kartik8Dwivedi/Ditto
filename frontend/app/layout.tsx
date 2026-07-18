@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-theme="dark"
+      data-theme="light"
       className="h-full antialiased"
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">

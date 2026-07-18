@@ -198,6 +198,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Logo visibility by active theme */
+.logo-dark-theme {
+  display: block;
+}
+.logo-light-theme {
+  display: none;
+}
+[data-theme='light'] .logo-dark-theme {
+  display: none;
+}
+[data-theme='light'] .logo-light-theme {
+  display: block;
+}
+
 ::selection {
   background: var(--accent);
   color: var(--accent-ink);

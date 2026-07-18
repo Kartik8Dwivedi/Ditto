@@ -1,13 +1,8 @@
 import type { ReactNode } from 'react';
-import { Scissors, Sparkles, TriangleAlert } from 'lucide-react';
+import { Scissors, Sparkles, TriangleAlert, ShieldAlert } from 'lucide-react';
 import type { ClusterSummary, RepoStats } from '@/types/ditto';
 import { cn } from '@/lib/utils';
 import { CountUp } from './count-up';
-
-/**
- * WOW #1 — the ~10 seconds that has to land "this thing understands my repo".
- * Dense on purpose: a judge should feel it knows a lot.
- */
 
 type Tone = 'danger' | 'warn' | 'success' | 'ai';
 
@@ -39,27 +34,33 @@ function StatRow({
   icon?: ReactNode;
 }) {
   return (
-    <div className="group flex items-center gap-3 py-[5px]">
-      <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center">
-        {icon ?? <span className={cn('size-1.5 rounded-full', DOT[tone])} />}
-      </span>
+    <div className="group flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded bg-inset border border-line-strong text-ink-subtle">
+          {icon ?? <span className={cn('size-1.5 rounded-full', DOT[tone])} />}
+        </span>
+        <span className="text-[12.5px] text-ink-muted truncate group-hover:text-ink transition-colors duration-150">
+          {label}
+        </span>
+      </div>
       <CountUp
         value={value}
         delayMs={delayMs}
-        className={cn('w-9 shrink-0 text-right font-mono text-[15px] font-semibold', TEXT[tone])}
+        className={cn('font-mono text-[14px] font-semibold pl-3 tracking-tight tabular-nums', TEXT[tone])}
       />
-      <span className="text-[13px] text-ink-muted">{label}</span>
     </div>
   );
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
-      <h3 className="mb-1.5 font-mono text-[10px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
+    <section className="rounded-xl border border-line bg-panel p-4 shadow-sm">
+      <h3 className="mb-3 font-mono text-[10px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
         {title}
       </h3>
-      {children}
+      <div className="divide-y divide-line/30 space-y-1">
+        {children}
+      </div>
     </section>
   );
 }
@@ -71,18 +72,12 @@ export function IntelligencePanel({
   stats: RepoStats;
   clusters: ClusterSummary[];
 }) {
-  /**
-   * Derived, not invented: "high risk" is exactly the clusters we both believe
-   * are semantic duplicates AND have executed to a real disagreement. Counting
-   * them here rather than reading a stat field means the headline can never
-   * claim more than the list below it can show.
-   */
   const highRisk = clusters.filter(
     (c) => c.disagreementRisk === 'semantic' && c.hasProvenDivergence,
   ).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <Group title="Code Intelligence">
         <StatRow
           tone="danger"
@@ -95,7 +90,7 @@ export function IntelligencePanel({
           value={stats.behavioralConflicts}
           label="Behavioral Conflicts"
           delayMs={60}
-          icon={<TriangleAlert className="size-3 text-danger" />}
+          icon={<ShieldAlert className="size-3 text-danger" />}
         />
         <StatRow
           tone="warn"
@@ -122,36 +117,35 @@ export function IntelligencePanel({
         <StatRow
           tone="danger"
           value={highRisk}
-          label="High-Risk Conflicting Implementations"
+          label="High-Risk Conflicting Impls"
           delayMs={300}
           icon={<TriangleAlert className="size-3 text-danger" />}
         />
       </Group>
 
       <Group title="Estimated Consolidation">
-        <div className="flex items-center gap-3 py-[5px]">
-          <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center">
-            <Scissors className="size-3 text-ink-subtle" />
+        <div className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded bg-inset border border-line-strong text-ink-subtle">
+              <Scissors className="size-3 text-ink-subtle" />
+            </span>
+            <span className="text-[12.5px] text-ink-muted truncate">Lines Removable</span>
+          </div>
+          <span className="font-mono text-[14px] font-semibold text-ink pl-3">
+            ~<CountUp value={stats.linesRemovable} delayMs={360} />
           </span>
-          <p className="text-[13px] text-ink-muted">
-            <span className="font-mono text-[15px] font-semibold text-ink">
-              ~<CountUp value={stats.linesRemovable} delayMs={360} />
-            </span>{' '}
-            lines potentially removable
-          </p>
         </div>
-        <div className="flex items-center gap-3 py-[5px]">
-          <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center">
-            <span className="size-1.5 rounded-full bg-ink-subtle" />
+        
+        <div className="flex items-center justify-between py-2.5 border-t border-line/30">
+          <div className="flex items-center gap-3 min-w-0">
+            <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded bg-inset border border-line-strong text-ink-subtle">
+              <span className="size-1.5 rounded-full bg-ink-subtle" />
+            </span>
+            <span className="text-[12.5px] text-ink-muted truncate">Unifiable Call Sites</span>
+          </div>
+          <span className="font-mono text-[14px] font-semibold text-ink pl-3">
+            <CountUp value={stats.callSitesUnifiable} delayMs={420} />
           </span>
-          <p className="text-[13px] text-ink-muted">
-            <CountUp
-              value={stats.callSitesUnifiable}
-              delayMs={420}
-              className="font-mono text-[15px] font-semibold text-ink"
-            />{' '}
-            call sites could be unified
-          </p>
         </div>
       </Group>
     </div>

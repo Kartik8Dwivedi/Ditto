@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Theme = 'dark' | 'light';
 
@@ -26,19 +27,19 @@ function subscribe(onChange: () => void): () => void {
 }
 
 function getSnapshot(): Theme {
-  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 }
 
 /** Matches what the server renders, so hydration agrees. */
 function getServerSnapshot(): Theme {
-  return 'dark';
+  return 'light';
 }
 
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   // Restores a remembered choice. This only writes to the DOM — an external
@@ -60,9 +61,12 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-      className="fixed right-3 bottom-3 z-20 rounded-md border border-line bg-panel/80 p-1.5 text-ink-subtle backdrop-blur transition-colors duration-150 hover:text-ink"
+      className={cn(
+        "rounded-md border border-line bg-panel/80 p-1.5 text-ink-subtle backdrop-blur transition-all duration-150 hover:text-ink hover:bg-inset hover:border-line-strong",
+        className
+      )}
     >
-      {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+      {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </button>
   );
 }

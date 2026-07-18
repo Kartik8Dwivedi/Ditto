@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { GitBranch } from 'lucide-react';
 import type { RepoSummary } from '@/types/ditto';
-import { DittoMark } from '@/components/ui/ditto-mark';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 /**
  * Absolute, in UTC, rather than "4h ago" — a relative label computed on the
@@ -30,8 +30,8 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
           href="/"
           className="flex items-center gap-2 text-ink transition-opacity duration-150 hover:opacity-80"
         >
-          <DittoMark className="size-4" />
-          <span className="font-mono text-[13px] font-semibold tracking-tight">ditto</span>
+          <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-5 w-auto shrink-0" />
+          <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-5 w-auto shrink-0" />
         </Link>
 
         <span aria-hidden className="h-3.5 w-px bg-line-strong" />
@@ -53,6 +53,8 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
           <span className="hidden font-mono text-[11px] text-ink-subtle sm:inline">
             indexed {formatIndexedAt(repo.indexedAt)} UTC
           </span>
+          <span aria-hidden className="hidden h-3.5 w-px bg-line-strong sm:inline" />
+          <ThemeToggle />
         </div>
       </div>
     </header>

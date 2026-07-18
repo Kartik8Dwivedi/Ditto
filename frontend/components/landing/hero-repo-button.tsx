@@ -1,35 +1,100 @@
 import Link from 'next/link';
-import { ArrowRight, GitBranch } from 'lucide-react';
-import type { RepoSummary } from '@/types/ditto';
+import { ArrowRight, GitBranch, ShieldAlert, Sparkles, Database } from 'lucide-react';
+import type { RepoSummary, RepoStats } from '@/types/ditto';
+import { cn } from '@/lib/utils';
 
-/**
- * The one-click path. The demo always uses these — the paste box is the
- * "try to break it" path.
- */
-export function HeroRepoButton({ repo, blurb }: { repo: RepoSummary; blurb: string }) {
+export interface RepoWithStats extends RepoSummary {
+  stats?: RepoStats;
+}
+
+export function HeroRepoButton({ repo, blurb }: { repo: RepoWithStats; blurb: string }) {
+  const score = repo.stats?.healthScore;
+  const isHealthy = score !== undefined ? score >= 80 : true;
+  const isWarning = score !== undefined ? score >= 50 && score < 80 : false;
+  
   return (
     <Link
       href={`/repo/${repo.id}`}
-      className="group flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-3 transition-colors duration-150 hover:border-line-strong hover:bg-inset"
+      className="group block rounded-xl border border-line bg-panel p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:bg-inset hover:shadow-lg hover:shadow-black/20"
     >
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-mono text-[13px] font-medium text-ink">
-          {repo.owner}
-          <span className="text-ink-subtle">/</span>
-          {repo.name}
-        </p>
-        <p className="mt-0.5 truncate text-[12px] text-ink-muted">{blurb}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-base font-semibold tracking-tight text-ink group-hover:text-accent transition-colors duration-150">
+              {repo.owner}
+              <span className="text-ink-subtle">/</span>
+              {repo.name}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded bg-panel border border-line px-2 py-0.5 font-mono text-[10px] text-ink-muted">
+              <GitBranch aria-hidden className="size-2.5" />
+              {repo.commit}
+            </span>
+          </div>
+          <p className="text-[13px] leading-relaxed text-ink-muted">{blurb}</p>
+        </div>
+
+        {score !== undefined && (
+          <div className="flex items-center gap-3 self-end sm:self-start">
+            <div className="text-right">
+              <div className="font-mono text-xs text-ink-subtle">Ditto Score</div>
+              <div className={cn(
+                "font-mono text-xl font-bold leading-none mt-0.5",
+                isHealthy && "text-success",
+                isWarning && "text-warn",
+                !isHealthy && !isWarning && "text-danger"
+              )}>
+                {score}<span className="text-[10px] font-normal text-ink-subtle">/100</span>
+              </div>
+            </div>
+            <span className="h-6 w-px bg-line-strong" />
+            <div className={cn(
+              "rounded-lg px-2.5 py-1 text-[11px] font-semibold border uppercase tracking-wider",
+              isHealthy && "bg-success-bg/20 border-success-line text-success",
+              isWarning && "bg-warn-bg/20 border-warn-line text-warn",
+              !isHealthy && !isWarning && "bg-danger-bg/20 border-danger-line text-danger"
+            )}>
+              {isHealthy ? 'Healthy' : isWarning ? 'Needs Work' : 'Dupe Risk'}
+            </div>
+          </div>
+        )}
       </div>
 
-      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-inset px-1.5 py-px font-mono text-[10px] text-ink-subtle group-hover:bg-panel">
-        <GitBranch aria-hidden className="size-2.5" />
-        {repo.commit}
-      </span>
+      <div className="mt-4 flex flex-wrap items-center justify-between border-t border-line/60 pt-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-mono text-[11px] text-ink-subtle">
+          {repo.stats ? (
+            <>
+              <span className="flex items-center gap-1.5">
+                <Database className="size-3 text-ink-subtle" />
+                <strong className="text-ink-muted font-medium">{repo.stats.functions.toLocaleString('en-US')}</strong> functions
+              </span>
+              <span className="hidden sm:inline text-line">•</span>
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="size-3 text-ai" />
+                <strong className="text-ink-muted font-medium">{repo.stats.semanticDuplicateClusters}</strong> clusters
+              </span>
+              {repo.stats.behavioralConflicts > 0 && (
+                <>
+                  <span className="hidden sm:inline text-line">•</span>
+                  <span className="flex items-center gap-1.5 text-danger">
+                    <ShieldAlert className="size-3" />
+                    <strong className="font-bold">{repo.stats.behavioralConflicts}</strong> conflicts proven
+                  </span>
+                </>
+              )}
+            </>
+          ) : (
+            <span className="text-ink-subtle">Select to load repo metrics</span>
+          )}
+        </div>
 
-      <ArrowRight
-        aria-hidden
-        className="size-3.5 shrink-0 text-ink-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-ink"
-      />
+        <div className="flex items-center gap-1 font-mono text-xs text-ink-subtle group-hover:text-ink transition-colors duration-150">
+          Open Intelligence
+          <ArrowRight
+            aria-hidden
+            className="size-3.5 transition-transform duration-150 group-hover:translate-x-1"
+          />
+        </div>
+      </div>
     </Link>
   );
 }
