@@ -1,13 +1,11 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { DittoApiError, fetchRepo } from '@/services/ditto.api';
-import { ANALYSIS_FUNCTION_CAP } from '@/lib/constants';
 import { ClusterList } from '@/components/map/cluster-list';
 import { DittoScore } from '@/components/map/ditto-score';
 import { IntelligencePanel } from '@/components/map/intelligence-panel';
 import { JscpdStrip } from '@/components/map/jscpd-strip';
 import { RepoHeader } from '@/components/map/repo-header';
-import { TruncationNotice } from '@/components/map/truncation-notice';
 
 // Live backend data, rendered per request (never prerendered at build).
 export const dynamic = 'force-dynamic';
@@ -65,8 +63,6 @@ export default async function RepoPage(props: PageProps<'/repo/[repoId]'>) {
         </aside>
 
         <main className="min-w-0 flex-1 space-y-4">
-          {stats.functions >= ANALYSIS_FUNCTION_CAP && <TruncationNotice stats={stats} />}
-
           <JscpdStrip stats={stats} />
 
           <section>
