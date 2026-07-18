@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/logo/ditto_dark_bg.png">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/logo/ditto_white_bg.png">
+    <img alt="Ditto Logo" src="frontend/public/logo/ditto_white_bg.png" width="300" />
+  </picture>
+</p>
+
 # Ditto — Semantic CI
 
 **Find functions that do the same thing but are written completely differently — then execute them to prove they disagree.**
