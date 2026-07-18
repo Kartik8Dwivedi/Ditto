@@ -1,4 +1,4 @@
-import type { HydratedDocument } from 'mongoose';
+import type { HydratedDocument, Types } from 'mongoose';
 
 import CrudRepository from './crud.repository.js';
 import { FunctionModel, type IFunction, type Fingerprint } from '../Models/index.js';
@@ -22,6 +22,38 @@ class FunctionRepository extends CrudRepository<IFunction> {
 
   async findByIds(ids: string[]): Promise<HydratedDocument<IFunction>[]> {
     return this.model.find({ _id: { $in: ids } }).exec();
+  }
+
+  /**
+   * Members of a cluster, WITHOUT their embeddings.
+   *
+   * The 1536-float vector is roughly 12KB per function and is never rendered —
+   * it exists for clustering, which has already happened by the time anything
+   * reads a cluster. Excluding it keeps the detail view's payload to the bodies
+   * we actually display.
+   */
+  async findByIdsForDisplay(ids: string[]): Promise<HydratedDocument<IFunction>[]> {
+    if (ids.length === 0) return [];
+    return this.model.find({ _id: { $in: ids } }).select('-embedding').exec();
+  }
+
+  /**
+   * Just `loc`, for specific functions.
+   *
+   * The Intelligence Map needs line counts and nothing else, but a function
+   * document carries its full source body AND a 1536-float embedding. Loading
+   * whole documents to read one number off each meant ~30MB over the wire and
+   * ~6.5s for a repo the size of cline. This projection is the difference
+   * between an 8s page and a fast one, so resist widening it: if a caller needs
+   * more fields, give it its own method rather than growing this one.
+   */
+  async findLocsByIds(ids: string[]): Promise<Array<{ _id: Types.ObjectId; loc: number }>> {
+    if (ids.length === 0) return [];
+    return this.model
+      .find({ _id: { $in: ids } })
+      .select('loc')
+      .lean<Array<{ _id: Types.ObjectId; loc: number }>>()
+      .exec();
   }
 
   /**

@@ -86,19 +86,33 @@ class IntelligenceService {
     return repos.map(toRepoSummary);
   }
 
-  /** The Intelligence Map payload: the repo, its stats, and its clusters. */
+  /**
+   * The Intelligence Map payload: the repo, its stats, and its clusters.
+   *
+   * The only thing this needs from the function collection is a line count per
+   * CLUSTER MEMBER, so it reads exactly that. Loading the repo's whole function
+   * set here (2654 documents for cline, each with a full source body and a
+   * 1536-float embedding) cost ~6.5s and ~30MB to extract a few hundred
+   * integers. Stats are denormalised onto the repo document, so they need no
+   * query at all.
+   */
   async getRepoDetail(repoId: string): Promise<{
     repo: RepoSummary;
     stats: RepoStats;
     clusters: ClusterSummary[];
   }> {
-    const repo = await this.repoRepository.findByIdOrFail(repoId);
-    const [functions, clusters] = await Promise.all([
-      this.functionRepository.findByRepo(repoId),
+    const [repo, clusters] = await Promise.all([
+      this.repoRepository.findByIdOrFail(repoId),
       this.clusterRepository.findByRepo(repoId),
     ]);
 
-    const locById = new Map(functions.map((fn) => [fn._id.toString(), fn.loc]));
+    // Only members can contribute removable lines, and clusters are a small
+    // fraction of a repo — so this scales with findings, not repo size.
+    const memberIds = [
+      ...new Set(clusters.flatMap((cluster) => cluster.functionIds.map((id) => id.toString()))),
+    ];
+    const locs = await this.functionRepository.findLocsByIds(memberIds);
+    const locById = new Map(locs.map((fn) => [fn._id.toString(), fn.loc]));
 
     return {
       repo: toRepoSummary(repo),
@@ -111,7 +125,8 @@ class IntelligenceService {
   async getClusterDetail(clusterId: string): Promise<ClusterDetail> {
     const cluster = await this.clusterRepository.findByIdOrFail(clusterId);
     const ids = cluster.functionIds.map((id) => id.toString());
-    const members = await this.functionRepository.findByIds(ids);
+    // Bodies yes, embeddings no — same over-fetch as above, smaller blast radius.
+    const members = await this.functionRepository.findByIdsForDisplay(ids);
 
     const locById = new Map(members.map((fn) => [fn._id.toString(), fn.loc]));
     const canonicalId = cluster.canonicalId.toString();
