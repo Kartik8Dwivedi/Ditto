@@ -153,12 +153,17 @@ export async function fetchCluster(clusterId: string): Promise<ClusterDetail> {
  * See docs/ONDEMAND.md.
  */
 export async function analyzeRepo(repoUrl: string): Promise<AnalyzeResponse> {
+  // Normalise to a canonical URL before sending. The backend requires a full
+  // github.com URL and rejects the `owner/name` shorthand, so we always send
+  // the canonical form even though the paste box accepts the shorthand.
+  const ref = parseGitHubRepo(repoUrl);
+  const canonicalUrl = ref ? `https://github.com/${ref.owner}/${ref.name}` : repoUrl.trim();
+
   if (SOURCE === 'mock') {
     await sleep(MOCK_LATENCY_MS / 3);
     // Offline dedup: a pasted URL for a repo we already ship as a fixture goes
     // straight to its map. Anything else cannot be analysed without the backend,
     // and we say so honestly rather than faking a progress bar to nowhere.
-    const ref = parseGitHubRepo(repoUrl);
     if (ref) {
       const match = getMockRepos().find(
         (r) => r.owner.toLowerCase() === ref.owner.toLowerCase() && r.name.toLowerCase() === ref.name.toLowerCase(),
@@ -170,7 +175,7 @@ export async function analyzeRepo(repoUrl: string): Promise<AnalyzeResponse> {
       'bad_response',
     );
   }
-  return request<AnalyzeResponse>('/analyze', { repoUrl });
+  return request<AnalyzeResponse>('/analyze', { repoUrl: canonicalUrl });
 }
 
 /** GET /api/v1/jobs/:jobId — poll an in-flight analysis. */
