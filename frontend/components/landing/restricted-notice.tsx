@@ -1,11 +1,7 @@
 import Link from 'next/link';
-import { ExternalLink, Gauge, Terminal } from 'lucide-react';
-import {
-  GITHUB_REPO_URL,
-  isRestrictedMode,
-  liveMaxFunctions,
-  SUGGESTED_REPOS,
-} from '@/lib/config';
+import { ExternalLink, Gauge } from 'lucide-react';
+import { GITHUB_REPO_URL, isRestrictedMode, liveMaxFunctions } from '@/lib/config';
+import { SuggestedRepos } from './suggested-repos';
 
 /**
  * Explains the hosted demo's analysis cap — before someone pastes a repo and
@@ -89,35 +85,3 @@ export function RestrictedNotice() {
   );
 }
 
-/**
- * Ready-to-paste repos known to sit under the cap.
- *
- * Hidden entirely while `SUGGESTED_REPOS` is the empty placeholder — showing an
- * unverified suggestion that turns out to be over the cap would walk a judge
- * into the exact failure this banner exists to prevent.
- */
-function SuggestedRepos() {
-  if (SUGGESTED_REPOS.length === 0) return null;
-
-  return (
-    <div className="space-y-1.5 pt-1">
-      <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-wider text-ink-subtle uppercase">
-        <Terminal aria-hidden className="size-3" />
-        Try one of these
-      </p>
-      <ul className="flex flex-wrap gap-1.5">
-        {SUGGESTED_REPOS.map((repo) => (
-          <li key={repo.url}>
-            <span
-              title={repo.url}
-              className="inline-flex items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2 py-1 font-mono text-[11px] text-ink"
-            >
-              {repo.slug}
-              {repo.note && <span className="text-ink-subtle">· {repo.note}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

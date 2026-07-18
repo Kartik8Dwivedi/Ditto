@@ -6,6 +6,7 @@ import { ArrowRight, LoaderCircle, Search, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { analyzeRepo, DittoApiError } from '@/services/ditto.api';
 import { parseGitHubRepo } from '@/lib/github';
+import { PASTE_BOX_INPUT_ID, usePasteBox } from '@/stores/paste-box.store';
 import { cn } from '@/lib/utils';
 
 /**
@@ -18,7 +19,9 @@ import { cn } from '@/lib/utils';
  */
 export function RepoPicker() {
   const router = useRouter();
-  const [value, setValue] = useState('');
+  // The input's text lives in a store so the suggested-repo chips can fill it.
+  const value = usePasteBox((s) => s.value);
+  const setValue = usePasteBox((s) => s.setValue);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -75,6 +78,7 @@ export function RepoPicker() {
             className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-ink-subtle"
           />
           <input
+            id={PASTE_BOX_INPUT_ID}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
