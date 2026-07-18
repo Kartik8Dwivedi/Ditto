@@ -13,7 +13,7 @@
 > Today CI asks: *does it compile? do tests pass? does lint pass?*
 > **Ditto adds: *are you reinventing something your codebase already knows?***
 
-🔗 **Live demo:** `<LIVE_FRONTEND_URL>` · **API:** `<LIVE_API_URL>` · **Demo video:** `<VIDEO_URL>`
+🔗 **Live demo:** `https://ditto-flax.vercel.app` · **API:** `https://ditto-backend-1016629498190.asia-south2.run.app` · **Demo video:** `<VIDEO_URL>`
 
 ---
 
