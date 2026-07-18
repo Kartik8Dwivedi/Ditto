@@ -1,0 +1,18 @@
+# Keep the Cloud Build context small and fast (root context = whole repo).
+# Only backend/{package*.json,tsconfig.json,src} are actually needed by the Dockerfile.
+
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/.cache
+.git
+.github
+frontend
+docs
+ditto-demo-shop
+.claude
+*.log
+**/.env
+**/.env.*
+!**/.sample.env
