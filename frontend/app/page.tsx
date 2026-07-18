@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { fetchRepos, fetchRepo } from '@/services/ditto.api';
+import { fetchRepos } from '@/services/ditto.api';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { HeroRepoButton } from '@/components/landing/hero-repo-button';
 import { RepoPicker } from '@/components/landing/repo-picker';
@@ -26,23 +26,7 @@ const BLURBS: Record<string, string> = {
 };
 
 export default async function Home() {
-  const reposSummary = await fetchRepos();
-  const repos = await Promise.all(
-    reposSummary.map(async (r) => {
-      try {
-        const detail = await fetchRepo(r.id);
-        return {
-          ...r,
-          stats: detail.stats,
-        };
-      } catch (err) {
-        return {
-          ...r,
-          stats: undefined,
-        };
-      }
-    })
-  );
+  const repos = await fetchRepos();
 
   return (
     <div className="relative min-h-screen w-full bg-canvas text-ink overflow-x-hidden">
