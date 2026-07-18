@@ -10,6 +10,10 @@ import type { RepoStats } from '@/types/ditto';
  * the numbers come straight from the backend.
  */
 export function TruncationNotice({ stats }: { stats: RepoStats }) {
+  // Repos analysed before these fields existed report 0/0 (cline does today).
+  // Treat unset as "no truncation known" rather than rendering a claim like
+  // "the first 0 of 2,654 functions", which would be alarming and false.
+  if (!(stats.functionsTotal > 0) || !(stats.functionsAnalyzed > 0)) return null;
   if (stats.functionsAnalyzed >= stats.functionsTotal) return null;
 
   return (

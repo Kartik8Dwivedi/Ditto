@@ -6,6 +6,10 @@ import { rankRepos, toRanked, type RankedRepo } from '@/lib/repo-ranking';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { HeroRepoButton } from '@/components/landing/hero-repo-button';
 import { RepoPicker } from '@/components/landing/repo-picker';
+import { RestrictedNotice } from '@/components/landing/restricted-notice';
+import { HowItWorksStrip } from '@/components/landing/how-it-works-strip';
+import { PortfolioEvidence } from '@/components/landing/portfolio-evidence';
+import { GuardRoadmapCard } from '@/components/landing/guard-roadmap-card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { 
   Code2, Cpu, ShieldAlert, Sparkles, Terminal, Zap, 
@@ -109,10 +113,28 @@ export default function Home() {
           <div className="w-full max-w-lg pt-4">
             <RepoPicker />
           </div>
+
+          {/* Explains the analysis cap before anyone pastes into it. Renders
+              nothing when restricted mode is off. */}
+          <div className="w-full max-w-2xl">
+            <RestrictedNotice />
+          </div>
+        </section>
+
+        {/* What Ditto does, and the six stages it runs. Static — renders with
+            the shell, no data needed. */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-line pb-2">
+            <Layers className="size-4 text-ink-subtle" />
+            <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
+              What Ditto Does
+            </h2>
+          </div>
+          <HowItWorksStrip />
         </section>
 
         {/* Ready Repos Section */}
-        <section className="space-y-4">
+        <section id="indexed-repos" className="space-y-4 scroll-mt-20">
           <div className="flex items-center gap-2 border-b border-line pb-2">
             <Terminal className="size-4 text-ink-subtle" />
             <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
@@ -143,16 +165,16 @@ export default function Home() {
             
             <div className="flex-1 space-y-4 text-xs md:text-[13px] leading-relaxed text-ink-muted">
               <p>
-                Today, **over 80% of software engineers use AI coding tools** (Copilot, Cursor, Devin) daily. These tools write code extremely fast, but they have a fatal design flaw: **they operate as local optimizers**. Because models are context-constrained and rely on basic vector RAG lookup, they cannot examine your entire codebase before writing a line of code.
+                Today, <strong className="text-ink font-medium">over 80% of software engineers use AI coding tools</strong> (Copilot, Cursor, Devin) daily. These tools write code extremely fast, but they have a fatal design flaw: <strong className="text-ink font-medium">they operate as local optimizers</strong>. Because models are context-constrained and rely on basic vector RAG lookup, they cannot examine your entire codebase before writing a line of code.
               </p>
               <p>
-                When an AI agent needs a simple date helper or string formatter, it doesn&apos;t search deep private subdirectories — it simply **re-implements the logic from scratch** under a different name in a new file.
+                When an AI agent needs a simple date helper or string formatter, it doesn&apos;t search deep private subdirectories — it simply <strong className="text-ink font-medium">re-implements the logic from scratch</strong> under a different name in a new file.
               </p>
               <div className="border-l-2 border-accent-line pl-3 py-1 bg-inset/50 rounded-r my-2">
-                <strong className="text-ink font-medium">The correctness cliff:</strong> Over months, you accumulate four functions doing the same job written completely differently. Standard CI accepts this because each copy passes its own file-level tests in isolation. But they behave slightly differently on edge cases, causing **silent behavioral drift** that breaks production.
+                <strong className="text-ink font-medium">The correctness cliff:</strong> Over months, you accumulate four functions doing the same job written completely differently. Standard CI accepts this because each copy passes its own file-level tests in isolation. But they behave slightly differently on edge cases, causing <strong className="text-ink font-medium">silent behavioral drift</strong> that breaks production.
               </div>
               <p>
-                Ditto acts as a persistent **Semantic Memory Layer**. Instead of letting slop compile, Ditto indexes your repository&apos;s behavioral intent, clusters clones, and proves where they diverge by executing them side-by-side.
+                Ditto acts as a persistent <strong className="text-ink font-medium">Semantic Memory Layer</strong>. Instead of letting slop compile, Ditto indexes your repository&apos;s behavioral intent, clusters clones, and proves where they diverge by executing them side-by-side.
               </p>
             </div>
           </div>
@@ -220,18 +242,18 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs md:text-[13px] leading-relaxed text-ink-muted">
             <div className="space-y-3">
               <p>
-                Many modern developer tools are simple prompts wrapped in an Express server, running full-codebase lookups that blow context windows and cost thousands of dollars. **Ditto is an actual static analyzer combined with sandbox execution.**
+                Many modern developer tools are simple prompts wrapped in an Express server, running full-codebase lookups that blow context windows and cost thousands of dollars. <strong className="text-ink font-medium">Ditto is an actual static analyzer combined with sandbox execution.</strong>
               </p>
               <p>
-                AI is strictly load-bearing in **two isolated stages** where regex patterns fail: normalizing structural differences into behavioral summaries, and guessing interesting inputs (empty values, limits, sign-flips).
+                AI is strictly load-bearing in <strong className="text-ink font-medium">two isolated stages</strong> where regex patterns fail: normalizing structural differences into behavioral summaries, and guessing interesting inputs (empty values, limits, sign-flips).
               </p>
             </div>
             <div className="space-y-3">
               <p>
-                The heavy lifting—grouping functions, extracting code syntax, running isolates, and compiling diffs—uses **hard, deterministic algorithms**.
+                The heavy lifting—grouping functions, extracting code syntax, running isolates, and compiling diffs—uses <strong className="text-ink font-medium">hard, deterministic algorithms</strong>.
               </p>
               <p>
-                By executing the code in Node worker threads, we take the LLM out of the final verdict. When Ditto tells you a budget parser is broken, it&apos;s because **V8 ran the functions side-by-side and got different answers.**
+                By executing the code in Node worker threads, we take the LLM out of the final verdict. When Ditto tells you a budget parser is broken, it&apos;s because <strong className="text-ink font-medium">V8 ran the functions side-by-side and got different answers.</strong>
               </p>
             </div>
           </div>
@@ -303,6 +325,9 @@ export default function Home() {
               Roadmap: End-to-End Slop Prevention
             </h2>
           </div>
+
+          {/* Next up, clearly marked as not shipped. */}
+          <GuardRoadmapCard />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="rounded-xl border border-line bg-panel p-5 space-y-2.5 relative">
@@ -379,24 +404,33 @@ async function IndexedRepos() {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {ranked.map((entry) => (
-        <HeroRepoButton key={entry.repo.id} {...entry} blurb={blurbFor(entry)} />
-      ))}
+    <div className="space-y-4">
+      {/* Totals summed from exactly these repos — same fetch, so the evidence
+          line can never disagree with the cards under it. */}
+      <PortfolioEvidence repos={ranked} />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {ranked.map((entry) => (
+          <HeroRepoButton key={entry.repo.id} {...entry} blurb={blurbFor(entry)} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function RepoCardsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-line bg-panel p-5">
-          <div className="h-5 w-44 animate-pulse rounded bg-inset" />
-          <div className="mt-2 h-4 w-60 animate-pulse rounded bg-inset" />
-          <div className="mt-6 h-4 w-full animate-pulse rounded bg-inset" />
-        </div>
-      ))}
+    <div className="space-y-4">
+      <div className="h-16 w-full animate-pulse rounded-xl bg-panel" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-line bg-panel p-5">
+            <div className="h-5 w-44 animate-pulse rounded bg-inset" />
+            <div className="mt-2 h-4 w-60 animate-pulse rounded bg-inset" />
+            <div className="mt-6 h-4 w-full animate-pulse rounded bg-inset" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
