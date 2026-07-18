@@ -3,3 +3,4 @@ export type { AsyncRequestHandler } from './asyncHandler.js';
 export { default as validate } from './validate.js';
 export type { RequestValidationSchema } from './validate.js';
 export { default as errorHandler, notFoundHandler } from './errorHandler.js';
+export { default as requireTaskSecret } from './requireTaskSecret.js';

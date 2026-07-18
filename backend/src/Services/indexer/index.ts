@@ -1,5 +1,5 @@
 export { default as IndexerService, DEFAULT_CACHE_DIR, cacheFileFor } from './indexer.service.js';
-export type { CacheFile, IndexOptions, IndexReport } from './indexer.service.js';
+export type { CacheFile, ExtractResult, IndexOptions, IndexReport } from './indexer.service.js';
 
 export { extractFromSource, explainPurity, hashBody } from './extract.js';
 export type { ExtractionResult } from './extract.js';

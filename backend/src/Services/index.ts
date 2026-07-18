@@ -28,7 +28,7 @@ export {
   isConfirmed,
   CONFIDENCE_THRESHOLD,
 } from './stats.service.js';
-export type { HealthScoreInput, StatsCluster, StatsFunction } from './stats.service.js';
+export type { HealthScoreInput, RepoStatsOptions, StatsCluster, StatsFunction } from './stats.service.js';
 
 export { default as AdjudicateService, ADJUDICATE_CONCURRENCY } from './adjudicate.service.js';
 export type { AdjudicatedCluster, AdjudicationMember } from './adjudicate.service.js';
@@ -45,4 +45,9 @@ export { default as PipelineService } from './pipeline.service.js';
 export type { PipelineOptions, PipelineReport } from './pipeline.service.js';
 
 export { IndexerService, cacheFileFor, DEFAULT_CACHE_DIR } from './indexer/index.js';
-export type { CacheFile, IndexOptions, IndexReport } from './indexer/index.js';
+export type { CacheFile, ExtractResult, IndexOptions, IndexReport } from './indexer/index.js';
+
+export { default as TasksService } from './tasks.service.js';
+
+export { default as AnalysisService, LIVE_MAX_FUNCTIONS, LIVE_CANDIDATE_CAP, LIVE_HARD_CEILING, LIVE_ANALYSIS_CAP } from './analysis.service.js';
+export type { AnalyzeResult } from './analysis.service.js';

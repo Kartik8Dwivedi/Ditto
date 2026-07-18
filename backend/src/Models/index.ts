@@ -8,12 +8,17 @@ export type { IFunction } from './function.model.js';
 export { default as ClusterModel } from './cluster.model.js';
 export type { ICluster } from './cluster.model.js';
 
+export { default as JobModel } from './job.model.js';
+export type { IJob } from './job.model.js';
+
 export {
   ExtractedFunctionSchema,
   ExtractorCacheFileSchema,
   FingerprintSchema,
   AdjudicationSchema,
   DisagreementRiskSchema,
+  JobStatusSchema,
+  JobStageSchema,
 } from './contracts.js';
 export type {
   ExtractedFunction,
@@ -28,4 +33,8 @@ export type {
   ClusterSummary,
   ClusterDetail,
   GuardResult,
+  Job,
+  JobStatus,
+  JobStage,
+  StageReporter,
 } from './contracts.js';

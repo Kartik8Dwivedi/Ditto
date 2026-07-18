@@ -130,9 +130,20 @@ export const isConfirmed = (cluster: StatsCluster): boolean =>
  *   module from their canonical. A duplicate next door is a copy-paste; a
  *   duplicate across the repo is somebody solving a solved problem again.
  */
+export interface RepoStatsOptions {
+  /**
+   * Functions the AST index found before any cap. Defaults to the number of
+   * functions passed in, so a fully-analysed repo reports `analyzed == total`.
+   * On a capped live run the caller passes the pre-cap total, and the gap is
+   * what the frontend keys its truncation note off — the only honest signal.
+   */
+  functionsTotal?: number;
+}
+
 export const computeRepoStats = (
   functions: StatsFunction[],
-  clusters: StatsCluster[]
+  clusters: StatsCluster[],
+  { functionsTotal }: RepoStatsOptions = {}
 ): RepoStats => {
   const byId = new Map(functions.map((fn) => [fn.id, fn]));
 
@@ -185,5 +196,7 @@ export const computeRepoStats = (
       behavioralConflicts,
       nearDuplicates,
     }),
+    functionsAnalyzed: functions.length,
+    functionsTotal: functionsTotal ?? functions.length,
   };
 };

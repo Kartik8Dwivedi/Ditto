@@ -21,6 +21,7 @@
   "author": "Kartik Dwivedi",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/tasks": "^6.2.3",
     "chalk": "^5.5.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",

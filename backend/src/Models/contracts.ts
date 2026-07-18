@@ -191,6 +191,60 @@ export type RepoStats = {
   callSitesUnifiable: number;
   /** 0-100. */
   healthScore: number;
+  /**
+   * How many functions the pipeline actually analysed, and how many the AST
+   * index found. They are equal for a fully-analysed repo (cline); on a capped
+   * live run `functionsAnalyzed < functionsTotal`, which is the ONLY honest
+   * signal the frontend uses to show a truncation note — never a hardcoded one.
+   */
+  functionsAnalyzed: number;
+  functionsTotal: number;
+};
+
+/* ------------------------------------------------------------------ *
+ * On-demand analysis (the live "paste a URL" path — see docs/ONDEMAND.md)
+ * ------------------------------------------------------------------ */
+
+export const JobStatusSchema = z.enum(['queued', 'running', 'done', 'failed']);
+export type JobStatus = z.infer<typeof JobStatusSchema>;
+
+/**
+ * Mirrors the frontend's PIPELINE_STAGES ids so the polled stepper can light up
+ * live. `fetch`/`parse` are the indexer; the rest are the pipeline stages.
+ */
+export const JobStageSchema = z.enum([
+  'queued',
+  'fetch',
+  'parse',
+  'fingerprint',
+  'embed',
+  'cluster',
+  'adjudicate',
+  'probe',
+  'done',
+]);
+export type JobStage = z.infer<typeof JobStageSchema>;
+
+/**
+ * How the indexer and pipeline report live progress to a job. Called at each
+ * stage boundary so the polled stepper advances; awaited, so a slow status
+ * write cannot race ahead of the work it describes.
+ */
+export type StageReporter = (stage: JobStage) => void | Promise<void>;
+
+/** The GET /jobs/:jobId payload the frontend polls. */
+export type Job = {
+  id: string;
+  status: JobStatus;
+  stage: JobStage | null;
+  /** Set when done — the repo to navigate to. */
+  repoId: string | null;
+  /** Human-readable, set when failed. */
+  error: string | null;
+  /** Total found by the AST index. */
+  functionsTotal: number | null;
+  /** How many we actually analysed (may be capped below the total). */
+  functionsAnalyzed: number | null;
 };
 
 export type ClusterSummary = {

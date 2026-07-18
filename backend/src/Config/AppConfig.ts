@@ -27,6 +27,20 @@ const envSchema = z.object({
   OPENAI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   // Only used by the local indexer to raise GitHub's anonymous rate limit.
   GITHUB_TOKEN: z.string().optional(),
+
+  // --- On-demand analysis (see docs/ONDEMAND.md) ---
+  // All optional so local `npm run dev` boots WITHOUT Cloud Tasks: when the
+  // queue is unconfigured, /analyze runs the job inline (fine for local
+  // testing); in production these are set and the job is enqueued instead.
+  // TASK_SECRET guards /internal/run — when unset, that route rejects EVERY
+  // call (403), so an unconfigured deployment can never be driven anonymously.
+  GCP_PROJECT: z.string().min(1).optional(),
+  TASKS_LOCATION: z.string().min(1).optional(),
+  TASKS_QUEUE: z.string().min(1).optional(),
+  // The public base URL of this service, so Cloud Tasks can call it back.
+  SERVICE_URL: z.string().url().optional(),
+  // Shared secret for the X-Ditto-Task-Secret header on /internal/run.
+  TASK_SECRET: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -54,6 +68,16 @@ const AppConfig = Object.freeze({
   EMBEDDING_MODEL: env.EMBEDDING_MODEL,
   OPENAI_TIMEOUT_MS: env.OPENAI_TIMEOUT_MS,
   GITHUB_TOKEN: env.GITHUB_TOKEN,
+  GCP_PROJECT: env.GCP_PROJECT,
+  TASKS_LOCATION: env.TASKS_LOCATION,
+  TASKS_QUEUE: env.TASKS_QUEUE,
+  SERVICE_URL: env.SERVICE_URL,
+  TASK_SECRET: env.TASK_SECRET,
+  // Cloud Tasks is usable only when every piece it needs is present. Off in
+  // local dev (→ /analyze runs the job inline); on in a configured deployment.
+  TASKS_ENABLED: Boolean(
+    env.GCP_PROJECT && env.TASKS_LOCATION && env.TASKS_QUEUE && env.SERVICE_URL && env.TASK_SECRET
+  ),
   RateLimiter,
 });
 

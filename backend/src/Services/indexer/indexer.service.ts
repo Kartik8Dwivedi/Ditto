@@ -6,7 +6,7 @@ import { fetchRepoFiles } from './github.js';
 import { isSourceFile } from './filter.js';
 import { extractFromSource } from './extract.js';
 import logger from '../../Config/logger.js';
-import type { ExtractedFunction } from '../../Models/contracts.js';
+import type { ExtractedFunction, StageReporter } from '../../Models/contracts.js';
 
 /**
  * THE INDEXER — a GitHub repo in, `ExtractedFunction[]` on disk out.
@@ -37,6 +37,20 @@ export interface IndexOptions {
    * function is named in the log.
    */
   maxFunctions?: number;
+  /** Live-progress reporter — called at the `fetch` and `parse` boundaries. */
+  onStage?: StageReporter;
+}
+
+/** In-memory extraction result, before anything is written to disk. */
+export interface ExtractResult {
+  owner: string;
+  name: string;
+  commit: string;
+  scope?: string;
+  functions: ExtractedFunction[];
+  filesScanned: number;
+  skippedByReason: Record<string, number>;
+  dropped: number;
 }
 
 export interface IndexReport {
@@ -67,9 +81,20 @@ export const cacheFileFor = (owner: string, name: string, cacheDir = DEFAULT_CAC
   path.join(cacheDir, `${owner}-${name}.json`);
 
 class IndexerService {
-  async run(options: IndexOptions): Promise<IndexReport> {
-    const { owner, name, branch, scope, cacheDir = DEFAULT_CACHE_DIR, maxFunctions } = options;
+  /**
+   * Fetch a repo and lift out every function, entirely in memory — no disk.
+   *
+   * This is the shared core: the local CLI ({@link run}) wraps it to also write
+   * a cache file, while the live on-demand path calls it directly and feeds the
+   * functions straight into the pipeline. `onStage` fires at the `fetch` and
+   * `parse` boundaries so a live job's stepper can advance. It does NOT cap by
+   * default — the live path wants the true total to enforce its ceiling and
+   * report `functionsTotal` honestly; the pipeline applies its own cap later.
+   */
+  async extract(options: IndexOptions): Promise<ExtractResult> {
+    const { owner, name, branch, scope, maxFunctions, onStage } = options;
 
+    await onStage?.('fetch');
     logger.info(
       `fetching ${owner}/${name}${branch ? `@${branch}` : ''}${scope ? ` (scope: ${scope})` : ''}...`
     );
@@ -80,6 +105,7 @@ class IndexerService {
       logger.warn(`skipped ${entry.file}: ${entry.reason}`);
     }
 
+    await onStage?.('parse');
     let functions: ExtractedFunction[] = [];
     const skippedByReason: Record<string, number> = {};
     const failed: string[] = [];
@@ -120,11 +146,29 @@ class IndexerService {
         `(${functions.filter((fn) => fn.isPure).length} pure) from ${repo.files.size} files`
     );
 
+    return {
+      owner,
+      name,
+      commit: repo.commit,
+      ...(scope ? { scope } : {}),
+      functions,
+      filesScanned: repo.files.size,
+      skippedByReason,
+      dropped,
+    };
+  }
+
+  async run(options: IndexOptions): Promise<IndexReport> {
+    const { owner, name, scope, cacheDir = DEFAULT_CACHE_DIR } = options;
+
+    const extracted = await this.extract(options);
+    const { functions, commit, filesScanned, skippedByReason, dropped } = extracted;
+
     const cacheFile = cacheFileFor(owner, name, cacheDir);
     const payload: CacheFile = {
       owner,
       name,
-      commit: repo.commit,
+      commit,
       ...(scope ? { scope } : {}),
       indexedAt: new Date().toISOString(),
       functions,
@@ -135,10 +179,10 @@ class IndexerService {
     return {
       owner,
       name,
-      commit: repo.commit,
+      commit,
       ...(scope ? { scope } : {}),
       cacheFile,
-      filesScanned: repo.files.size,
+      filesScanned,
       functions: functions.length,
       pureFunctions: functions.filter((fn) => fn.isPure).length,
       exportedFunctions: functions.filter((fn) => fn.isExported).length,

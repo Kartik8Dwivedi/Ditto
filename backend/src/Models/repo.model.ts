@@ -38,6 +38,8 @@ const statsSchema = new mongoose.Schema<RepoStats>(
     linesRemovable: { type: Number, default: 0 },
     callSitesUnifiable: { type: Number, default: 0 },
     healthScore: { type: Number, default: 100 },
+    functionsAnalyzed: { type: Number, default: 0 },
+    functionsTotal: { type: Number, default: 0 },
   },
   { _id: false }
 );

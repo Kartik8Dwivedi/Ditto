@@ -21,6 +21,7 @@ import {
   type ICluster,
   type IFunction,
   type RepoStats,
+  type StageReporter,
 } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
 
@@ -55,6 +56,24 @@ export interface PipelineOptions {
    * this IS set, every dropped function is named in the log.
    */
   maxFunctions?: number;
+  /**
+   * Pre-extracted functions, supplied by the live on-demand path so nothing
+   * touches disk. When present, the pipeline skips reading the extractor cache
+   * and uses these directly; `commit` must be supplied alongside.
+   */
+  functions?: ExtractedFunction[];
+  /** Commit the supplied `functions` were extracted from. */
+  commit?: string;
+  /**
+   * True total the AST index found, before {@link maxFunctions}. Recorded in
+   * the stats so the frontend can show an honest truncation note; defaults to
+   * the analysed count (so a full run reports `analyzed == total`).
+   */
+  functionsTotal?: number;
+  /** Cap on candidate clusters adjudicated — the direct cost lever on the live path. */
+  candidateCap?: number;
+  /** Live-progress reporter — fires at each pipeline stage boundary. */
+  onStage?: StageReporter;
 }
 
 export interface PipelineReport {
@@ -130,9 +149,16 @@ class PipelineService {
   }
 
   async run(options: PipelineOptions): Promise<PipelineReport> {
-    const { owner, name, cacheDir = DEFAULT_CACHE_DIR, maxFunctions } = options;
+    const { owner, name, cacheDir = DEFAULT_CACHE_DIR, maxFunctions, candidateCap, onStage } = options;
 
-    const extracted = await this.readExtractorCache(owner, name, cacheDir);
+    // The live path supplies functions in memory; the local CLI reads the cache
+    // the indexer wrote. Either way, the total is captured BEFORE any cap so the
+    // truncation signal is honest.
+    const extracted =
+      options.functions !== undefined
+        ? { functions: options.functions, commit: options.commit ?? 'unknown' }
+        : await this.readExtractorCache(owner, name, cacheDir);
+    const functionsTotal = options.functionsTotal ?? extracted.functions.length;
     let functions = extracted.functions;
     if (maxFunctions !== undefined && functions.length > maxFunctions) {
       const removed = functions.slice(maxFunctions);
@@ -151,6 +177,7 @@ class PipelineService {
     const repoId = repo._id.toString();
 
     // ---- stage 1: fingerprint (cheap model, one function per call) ----
+    await onStage?.('fingerprint');
     const cached = await this.functionRepository.findCachedDerivations(
       functions.map((fn) => fn.bodyHash)
     );
@@ -164,6 +191,7 @@ class PipelineService {
     );
 
     // ---- stage 2: embed the fingerprint, never the code ----
+    await onStage?.('embed');
     // Cached embeddings are only reusable if they were built with the CURRENT
     // embed-text recipe. bodyHash is unchanged when the text changes, so without
     // this check a recipe change (like dropping the behaviour steps in v2) would
@@ -197,8 +225,12 @@ class PipelineService {
     await this.repoRepository.update(repoId, { $set: { embedVersion: EMBED_VERSION } });
 
     // ---- stage 3: cluster (deterministic, 0 tokens) ----
+    await onStage?.('cluster');
     const analysable = saved.filter(isAnalysable);
-    const candidates = findCandidateClusters(analysable.map(toClusterable));
+    const candidates = findCandidateClusters(
+      analysable.map(toClusterable),
+      candidateCap !== undefined ? { maxClusters: candidateCap } : {}
+    );
     // Guard against over-clustering: a generous threshold buys recall at the
     // cost of adjudication calls, so the candidate count and the biggest cluster
     // are logged — each candidate is one flagship call we are about to pay for.
@@ -211,6 +243,7 @@ class PipelineService {
     );
 
     // ---- stage 4: adjudicate (flagship, one cluster per call) ----
+    await onStage?.('adjudicate');
     const byId = new Map(saved.map((doc) => [doc._id.toString(), doc]));
     const cohesionByKey = new Map(candidates.map((c) => [clusterKey(c.memberIds), c.cohesion]));
 
@@ -232,6 +265,7 @@ class PipelineService {
     );
 
     // ---- stage 5: probe (deterministic, 0 tokens) ----
+    await onStage?.('probe');
     const limit = pLimit(PROBE_CONCURRENCY);
     const clusterDocs = await Promise.all(
       adjudicated.clusters.map((cluster) =>
@@ -281,7 +315,8 @@ class PipelineService {
         isPure: doc.isPure,
         isExported: doc.isExported,
       })),
-      clusterDocs.map(toStatsCluster)
+      clusterDocs.map(toStatsCluster),
+      { functionsTotal }
     );
     await this.repoRepository.saveStats(repoId, stats);
 
