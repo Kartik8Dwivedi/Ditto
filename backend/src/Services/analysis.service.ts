@@ -26,7 +26,7 @@ import type { HydratedDocument } from 'mongoose';
 
 /**
  * The live caps, read from the environment so TEST mode (2000/100) and JUDGING
- * mode (300/20) are an env edit + redeploy apart — never a code change. See
+ * mode (600/20) are an env edit + redeploy apart — never a code change. See
  * AppConfig and docs/ONDEMAND.md. The offline CLI pipeline ignores these.
  */
 export const LIVE_MAX_FUNCTIONS = AppConfig.LIVE_MAX_FUNCTIONS;

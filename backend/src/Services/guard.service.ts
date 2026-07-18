@@ -24,7 +24,7 @@ import type { HydratedDocument } from 'mongoose';
 
 /**
  * Below this similarity we do not pay a flagship model to tell us what the
- * vectors already said. The result is 'novel' and the PR costs ~₹0.10.
+ * vectors already said. The result is 'novel' and the PR costs ≈ ₹0.15.
  */
 export const GUARD_SEARCH_FLOOR = 0.8;
 

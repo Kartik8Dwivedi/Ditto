@@ -48,7 +48,7 @@ const envSchema = z.object({
    *
    *   TEST MODE     LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
    *     Our hero runs: a full analysis comparable to the offline cline run.
-   *   JUDGING MODE  LIVE_MAX_FUNCTIONS=300   LIVE_CANDIDATE_CAP=20
+   *   JUDGING MODE  LIVE_MAX_FUNCTIONS=600   LIVE_CANDIDATE_CAP=20
    *     Flip to this before judging — protects the API budget when strangers
    *     are pasting URLs. ~₹25-35 per run instead of several hundred.
    *
