@@ -132,7 +132,7 @@ Three decisions make it work:
 
 | | Cost |
 |---|---|
-| Analyse a repo **once**, offline | **₹50 – ₹230** depending on size |
+| Analyse a repo **once**, offline | **₹232** at 2,870 functions · **~₹70** at 336 · **under ₹1** for a small library |
 | **Serve** the results, forever | **₹0** — the deployed app reads pre-computed data |
 | Each pull request afterwards | **~₹1 (~$0.01)** (roadmap) |
 
@@ -218,7 +218,7 @@ npm run pipeline -- cline/cline
 
 Reads what the indexer cached, then: fingerprint → embed → cluster → adjudicate → probe → MongoDB.
 
-- **Cost:** ₹50–230 depending on repo size. It prints a full token and cost breakdown per model when it finishes.
+- **Cost:** measured **₹232** for a 2,870-function repo, **~₹70** at 336 functions, **under ₹1** for a small library. It prints a full token and cost breakdown per model when it finishes.
 - **Time:** a few minutes for a small repo; roughly 10–15 for ~2,500 functions.
 - **Re-runs are nearly free.** Fingerprints and embeddings are cached by a hash of the function body, so unchanged code is never paid for twice.
 
