@@ -204,7 +204,22 @@ async function main() {
       checkRepoSummary(detail.repo ?? {}, '/repos/:id .repo');
       checkStats(detail.stats ?? {}, '/repos/:id .stats');
       if (!Array.isArray(detail.clusters)) note('/repos/:id .clusters', 'expected array');
-      else detail.clusters.forEach((c, i) => checkClusterSummary(c, `/repos/:id .clusters[${i}]`));
+      else {
+        detail.clusters.forEach((c, i) => checkClusterSummary(c, `/repos/:id .clusters[${i}]`));
+        // behavioralConflicts is the SUSPECTED count and must be a superset of
+        // what was actually executed and proven. Fewer suspected than proven
+        // would mean the UI could claim proof the cluster list cannot show.
+        const proven = detail.clusters.filter((c) => c.hasProvenDivergence).length;
+        if (isNum(detail.stats?.behavioralConflicts) && detail.stats.behavioralConflicts < proven) {
+          note(
+            '/repos/:id .stats.behavioralConflicts',
+            `${detail.stats.behavioralConflicts} suspected but ${proven} clusters are proven — suspected can never be fewer than proven`,
+          );
+        }
+        console.log(
+          `  ↳ conflicts: ${detail.stats?.behavioralConflicts} suspected · ${proven} proven by execution`,
+        );
+      }
       console.log(`  /repos/${repoId}  → ${detail.clusters?.length ?? 0} cluster(s)`);
     }
   } else {

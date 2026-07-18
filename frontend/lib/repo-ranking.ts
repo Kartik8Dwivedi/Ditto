@@ -5,25 +5,19 @@
  * count. Entirely data-driven — there is no hero list. A newly analysed repo
  * with real findings rises on its own; a clean library sinks on its own.
  */
-import type { ClusterSummary, RepoDetail, RepoStats, RepoSummary } from '@/types/ditto';
+import type { RepoDetail, RepoStats, RepoSummary } from '@/types/ditto';
+import { countProvenDivergences } from '@/lib/repo-metrics';
 
 export type RankedRepo = {
   repo: RepoSummary;
   /** null when the detail fetch failed — the card still renders, without metrics. */
   stats: RepoStats | null;
-  /** Clusters Ditto executed and proved disagree. */
+  /**
+   * Clusters Ditto executed and proved disagree — NOT `stats.behavioralConflicts`,
+   * which is the broader "suspected" count. See lib/repo-metrics.ts.
+   */
   provenDivergences: number;
 };
-
-/**
- * The number a reader can verify by counting the "they disagree" rows on the
- * map. Deliberately derived from the cluster list rather than read from
- * `stats.behavioralConflicts`, which counts something broader and does not
- * match the rows on screen.
- */
-export function countProvenDivergences(clusters: ClusterSummary[]): number {
-  return clusters.filter((c) => c.hasProvenDivergence).length;
-}
 
 export function toRanked(detail: RepoDetail): RankedRepo {
   return {

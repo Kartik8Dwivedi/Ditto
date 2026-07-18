@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import { Scissors, Sparkles, TriangleAlert, ShieldAlert } from 'lucide-react';
 import type { ClusterSummary, RepoStats } from '@/types/ditto';
+import {
+  countProvenDivergences,
+  countSuspectedConflicts,
+  PROVEN_LABEL,
+  SUSPECTED_LABEL,
+} from '@/lib/repo-metrics';
 import { cn } from '@/lib/utils';
 import { CountUp } from './count-up';
 
@@ -72,9 +78,12 @@ export function IntelligencePanel({
   stats: RepoStats;
   clusters: ClusterSummary[];
 }) {
-  const highRisk = clusters.filter(
-    (c) => c.disagreementRisk === 'semantic' && c.hasProvenDivergence,
-  ).length;
+  // Two different claims, deliberately shown side by side. `suspected` is the
+  // adjudicator flagging semantic risk; `proven` is what Ditto actually
+  // executed and watched disagree — the number you get by counting the
+  // "they disagree" rows in the cluster list.
+  const suspected = countSuspectedConflicts(stats);
+  const proven = countProvenDivergences(clusters);
 
   return (
     <div className="space-y-4">
@@ -86,11 +95,18 @@ export function IntelligencePanel({
           delayMs={0}
         />
         <StatRow
-          tone="danger"
-          value={stats.behavioralConflicts}
-          label="Behavioral Conflicts"
+          tone="warn"
+          value={suspected}
+          label={SUSPECTED_LABEL}
           delayMs={60}
-          icon={<ShieldAlert className="size-3 text-danger" />}
+          icon={<ShieldAlert className="size-3 text-warn" />}
+        />
+        <StatRow
+          tone="danger"
+          value={proven}
+          label={PROVEN_LABEL}
+          delayMs={90}
+          icon={<TriangleAlert className="size-3 text-danger" />}
         />
         <StatRow
           tone="warn"
@@ -107,19 +123,18 @@ export function IntelligencePanel({
       </Group>
 
       <Group title="AI Risk">
+        {/*
+          The old "High-Risk Conflicting Impls" row lived here and counted the
+          same executed clusters as "Proven by Execution" above. Two rows for
+          one number, in two different groups, invited exactly the confusion
+          this fix is about — so it is stated once, next to its counterpart.
+        */}
         <StatRow
           tone="ai"
           value={stats.suspectedReinvented}
           label="Suspected Reinvented Utilities"
           delayMs={240}
           icon={<Sparkles className="size-3 text-ai" />}
-        />
-        <StatRow
-          tone="danger"
-          value={highRisk}
-          label="High-Risk Conflicting Impls"
-          delayMs={300}
-          icon={<TriangleAlert className="size-3 text-danger" />}
         />
       </Group>
 

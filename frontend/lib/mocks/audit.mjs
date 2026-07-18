@@ -128,9 +128,15 @@ function auditRepo(entry) {
   if (stats.semanticDuplicateClusters !== details.length) {
     fail(at, `stats say ${stats.semanticDuplicateClusters} clusters, fixture has ${details.length}`);
   }
+  // `behavioralConflicts` is the SUSPECTED count (adjudicator-flagged) and is a
+  // superset of what was executed and proven. It may exceed the proven count —
+  // it must never be smaller, which would mean claiming proof we never had.
   const proven = details.filter((c) => c.hasProvenDivergence).length;
-  if (stats.behavioralConflicts !== proven) {
-    fail(at, `stats say ${stats.behavioralConflicts} conflicts, ${proven} clusters are proven`);
+  if (stats.behavioralConflicts < proven) {
+    fail(
+      at,
+      `stats say ${stats.behavioralConflicts} suspected conflicts but ${proven} clusters are proven — suspected can never be fewer than proven`,
+    );
   }
   const lines = details.reduce((t, c) => t + c.linesRemovable, 0);
   if (stats.linesRemovable !== lines) {

@@ -1,5 +1,11 @@
 import { Terminal } from 'lucide-react';
-import type { RepoStats } from '@/types/ditto';
+import type { ClusterSummary, RepoStats } from '@/types/ditto';
+import {
+  countProvenDivergences,
+  countSuspectedConflicts,
+  PROVEN_HELP,
+  SUSPECTED_HELP,
+} from '@/lib/repo-metrics';
 
 /**
  * The contrast beat (PRD §4.4, demo 0:15–0:35).
@@ -11,7 +17,16 @@ import type { RepoStats } from '@/types/ditto';
  * syntactically-different equivalents, which is definitionally true. We are not
  * claiming jscpd is bad. It is answering a different question correctly.
  */
-export function JscpdStrip({ stats }: { stats: RepoStats }) {
+export function JscpdStrip({
+  stats,
+  clusters,
+}: {
+  stats: RepoStats;
+  clusters: ClusterSummary[];
+}) {
+  const suspected = countSuspectedConflicts(stats);
+  const proven = countProvenDivergences(clusters);
+
   return (
     <section className="grid grid-cols-1 overflow-hidden rounded-lg border border-line md:grid-cols-2">
       <div className="border-b border-line bg-inset md:border-r md:border-b-0">
@@ -47,9 +62,16 @@ export function JscpdStrip({ stats }: { stats: RepoStats }) {
             Semantic clusters:{' '}
             <span className="font-semibold text-danger">{stats.semanticDuplicateClusters}</span>
           </p>
-          <p className="text-ink-muted">
-            Proven conflicts:{' '}
-            <span className="font-semibold text-danger">{stats.behavioralConflicts}</span>
+          {/*
+            These two are different claims and are never merged. `suspected` is
+            the adjudicator's opinion; `proven` is what we executed. Showing
+            both is stronger than showing one big number.
+          */}
+          <p className="text-ink-muted" title={SUSPECTED_HELP}>
+            Suspected conflicts: <span className="font-semibold text-warn">{suspected}</span>
+          </p>
+          <p className="text-ink-muted" title={PROVEN_HELP}>
+            Proven by execution: <span className="font-semibold text-danger">{proven}</span>
           </p>
           <p className="mt-1 text-[11px] text-ink-subtle">
             Same behaviour, different tokens — so jscpd cannot see them.

@@ -79,7 +79,7 @@ export default async function RepoPage(props: PageProps<'/repo/[repoId]'>) {
           {/* Renders only when the live pipeline capped the analysis. */}
           <TruncationNotice stats={stats} />
 
-          <JscpdStrip stats={stats} />
+          <JscpdStrip stats={stats} clusters={clusters} />
 
           <section className="space-y-3">
             <div className="flex items-baseline justify-between border-b border-line pb-2">
