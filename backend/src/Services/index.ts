@@ -49,5 +49,11 @@ export type { CacheFile, ExtractResult, IndexOptions, IndexReport } from './inde
 
 export { default as TasksService } from './tasks.service.js';
 
-export { default as AnalysisService, LIVE_MAX_FUNCTIONS, LIVE_CANDIDATE_CAP, LIVE_HARD_CEILING, LIVE_ANALYSIS_CAP } from './analysis.service.js';
+export {
+  default as AnalysisService,
+  LIVE_MAX_FUNCTIONS,
+  LIVE_CANDIDATE_CAP,
+  LIVE_ANALYSIS_CAP,
+  describeLiveCaps,
+} from './analysis.service.js';
 export type { AnalyzeResult } from './analysis.service.js';

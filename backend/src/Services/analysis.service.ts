@@ -6,6 +6,7 @@ import PipelineService from './pipeline.service.js';
 import TasksService from './tasks.service.js';
 import { JobRepository, RepoRepository } from '../Repository/index.js';
 import { parseGitHubUrl } from '../Validators/analysis.validator.js';
+import AppConfig from '../Config/AppConfig.js';
 import logger from '../Config/logger.js';
 import AppError from '../Utils/errors/AppError.js';
 import type { Job, IJob, StageReporter } from '../Models/index.js';
@@ -23,14 +24,20 @@ import type { HydratedDocument } from 'mongoose';
  * See docs/ONDEMAND.md — the caps here are the abuse/cost safety, non-negotiable.
  */
 
-/** The live pipeline analyses at most this many functions (see docs/ONDEMAND.md). */
-export const LIVE_MAX_FUNCTIONS = 250;
-/** ...and adjudicates at most this many candidate clusters (the cost lever). */
-export const LIVE_CANDIDATE_CAP = 20;
-/** Above this, a repo is refused before we spend a rupee on it. */
-export const LIVE_HARD_CEILING = 5000;
+/**
+ * The live caps, read from the environment so TEST mode (2000/100) and JUDGING
+ * mode (300/20) are an env edit + redeploy apart — never a code change. See
+ * AppConfig and docs/ONDEMAND.md. The offline CLI pipeline ignores these.
+ */
+export const LIVE_MAX_FUNCTIONS = AppConfig.LIVE_MAX_FUNCTIONS;
+export const LIVE_CANDIDATE_CAP = AppConfig.LIVE_CANDIDATE_CAP;
 /** Total live analyses allowed for the whole event — protects the key. */
 export const LIVE_ANALYSIS_CAP = 20;
+
+/** One line naming the mode that is actually live, for the Cloud Run logs. */
+export const describeLiveCaps = (): string =>
+  `live caps: maxFunctions=${LIVE_MAX_FUNCTIONS} candidateCap=${LIVE_CANDIDATE_CAP} ` +
+  `deadline=${Math.round(AppConfig.LIVE_DEADLINE_MS / 1000)}s`;
 
 export interface AnalyzeResult {
   /** Set when a new analysis was queued. */
@@ -137,10 +144,34 @@ class AnalysisService {
       return;
     }
 
+    // Every live run states the mode it is running under, so the Cloud Run logs
+    // answer "which caps are actually live?" without guessing at the env.
+    logger.info(`job ${jobId} (${job.owner}/${job.name}) starting — ${describeLiveCaps()}`);
+
+    const startedAt = Date.now();
+    const elapsedMs = (): number => Date.now() - startedAt;
+    const elapsed = (): string => `${(elapsedMs() / 1000).toFixed(1)}s`;
+
     let functionsTotal: number | undefined;
     try {
       await this.jobRepository.markRunning(jobId);
-      const onStage: StageReporter = (stage) => this.jobRepository.setStage(jobId, stage);
+
+      /**
+       * Stage boundaries do three things: advance the job the frontend polls,
+       * log elapsed time so we can measure our margin against Cloud Run's 1200s
+       * request timeout on a real run, and enforce our own earlier deadline.
+       */
+      const onStage: StageReporter = async (stage) => {
+        logger.info(`job ${jobId} [t+${elapsed()}] → ${stage}`);
+        if (elapsedMs() > AppConfig.LIVE_DEADLINE_MS) {
+          throw new AppError(
+            `Analysis exceeded the ${Math.round(AppConfig.LIVE_DEADLINE_MS / 1000)}s live time budget ` +
+              `at the "${stage}" stage. Try a smaller repo.`,
+            StatusCodes.REQUEST_TIMEOUT
+          );
+        }
+        await this.jobRepository.setStage(jobId, stage);
+      };
 
       const extracted = await this.indexerService.extract({
         owner: job.owner,
@@ -150,11 +181,14 @@ class AnalysisService {
       });
       functionsTotal = extracted.functions.length;
 
-      // Refuse an oversized repo BEFORE any paid stage runs.
-      if (functionsTotal > LIVE_HARD_CEILING) {
+      // HARD CEILING, not truncation. Dropping functions to fit a cap makes
+      // clusters silently vanish, and a repo that is half-analysed then reads as
+      // clean — worse than an honest refusal. So we refuse, before spending
+      // anything, and a run that DOES complete always has analysed == total.
+      if (functionsTotal > LIVE_MAX_FUNCTIONS) {
         throw new AppError(
-          `This repo is too large for the live demo (${functionsTotal} functions). ` +
-            `Try a smaller repo, or explore our pre-analysed repos.`,
+          `This repo has ${functionsTotal} functions, above the current live limit of ` +
+            `${LIVE_MAX_FUNCTIONS} — try a smaller repo.`,
           StatusCodes.UNPROCESSABLE_ENTITY
         );
       }
@@ -164,25 +198,31 @@ class AnalysisService {
         name: job.name,
         functions: extracted.functions,
         commit: extracted.commit,
-        maxFunctions: LIVE_MAX_FUNCTIONS,
         candidateCap: LIVE_CANDIDATE_CAP,
         functionsTotal,
         onStage,
       });
 
+      // No cap was applied (anything over the limit was refused above), so the
+      // analysed count IS the total — the frontend shows no truncation note.
       await this.jobRepository.markDone(jobId, {
         repoId: new Types.ObjectId(report.repoId),
-        functionsAnalyzed: Math.min(functionsTotal, LIVE_MAX_FUNCTIONS),
+        functionsAnalyzed: functionsTotal,
         functionsTotal,
       });
-      logger.success(`analysis job ${jobId} done → repo ${report.repoId}`);
+      logger.success(
+        `analysis job ${jobId} done in ${elapsed()} → repo ${report.repoId} ` +
+          `(${functionsTotal} functions, ${report.candidateClusters} candidates)`
+      );
     } catch (err) {
       // An AppError carries a client-safe message; anything else is masked.
       const message =
         err instanceof AppError
           ? err.message
           : 'Analysis failed unexpectedly. Please try another repo.';
-      logger.error(`analysis job ${jobId} failed: ${err instanceof Error ? err.message : err}`);
+      logger.error(
+        `analysis job ${jobId} failed after ${elapsed()}: ${err instanceof Error ? err.message : err}`
+      );
       await this.jobRepository.markFailed(jobId, message, functionsTotal);
     }
   }

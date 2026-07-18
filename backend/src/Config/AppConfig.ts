@@ -41,6 +41,31 @@ const envSchema = z.object({
   SERVICE_URL: z.string().url().optional(),
   // Shared secret for the X-Ditto-Task-Secret header on /internal/run.
   TASK_SECRET: z.string().min(1).optional(),
+
+  /**
+   * LIVE CAPS — the only knobs separating a rich demo run from a cheap one.
+   * Changing mode is an env edit + redeploy, never a code change:
+   *
+   *   TEST MODE     LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
+   *     Our hero runs: a full analysis comparable to the offline cline run.
+   *   JUDGING MODE  LIVE_MAX_FUNCTIONS=300   LIVE_CANDIDATE_CAP=20
+   *     Flip to this before judging — protects the API budget when strangers
+   *     are pasting URLs. ~₹25-35 per run instead of several hundred.
+   *
+   * These bound the LIVE path only. The offline CLI pipeline is unaffected and
+   * keeps its full-run behaviour.
+   */
+  LIVE_MAX_FUNCTIONS: z.coerce.number().int().positive().default(2000),
+  LIVE_CANDIDATE_CAP: z.coerce.number().int().positive().default(100),
+  /**
+   * Wall-clock budget for one live run, checked at every stage boundary.
+   *
+   * Cloud Run kills the request at 1200s; if that happens mid-pipeline the job
+   * is never marked done or failed and sticks on "running" forever. Aborting
+   * ourselves at 1080s turns that silent hang into an honest failed job with a
+   * message, leaving 120s of headroom to write the failure and respond.
+   */
+  LIVE_DEADLINE_MS: z.coerce.number().int().positive().default(1_080_000),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -73,6 +98,9 @@ const AppConfig = Object.freeze({
   TASKS_QUEUE: env.TASKS_QUEUE,
   SERVICE_URL: env.SERVICE_URL,
   TASK_SECRET: env.TASK_SECRET,
+  LIVE_MAX_FUNCTIONS: env.LIVE_MAX_FUNCTIONS,
+  LIVE_CANDIDATE_CAP: env.LIVE_CANDIDATE_CAP,
+  LIVE_DEADLINE_MS: env.LIVE_DEADLINE_MS,
   // Cloud Tasks is usable only when every piece it needs is present. Off in
   // local dev (→ /analyze runs the job inline); on in a configured deployment.
   TASKS_ENABLED: Boolean(

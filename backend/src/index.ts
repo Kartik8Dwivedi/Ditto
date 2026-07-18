@@ -2,6 +2,7 @@ import createApp from './app.js';
 import AppConfig from './Config/AppConfig.js';
 import logger from './Config/logger.js';
 import { connectToDB, disconnectFromDB } from './Config/db.js';
+import { describeLiveCaps } from './Services/analysis.service.js';
 
 /**
  * Application entry point. Responsible for process-level concerns:
@@ -15,6 +16,9 @@ const start = async (): Promise<void> => {
   const app = createApp();
   const server = app.listen(AppConfig.PORT, () => {
     logger.success(`Server running on port ${AppConfig.PORT} [${AppConfig.NODE_ENV}]`);
+    // Which live mode is actually deployed? Answer it here rather than guessing
+    // at the Cloud Run env after a mode flip.
+    logger.info(describeLiveCaps());
   });
 
   /** Drains in-flight requests, closes the DB, then exits. */

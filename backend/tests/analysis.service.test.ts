@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import AnalysisService, {
   LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP,
-  LIVE_HARD_CEILING,
   LIVE_ANALYSIS_CAP,
+  describeLiveCaps,
 } from '../src/Services/analysis.service.js';
 
 /**
@@ -127,57 +127,61 @@ describe('AnalysisService.analyze', () => {
   });
 });
 
+describe('describeLiveCaps', () => {
+  it('names the caps that are actually live, so a mode flip is verifiable in the logs', () => {
+    const line = describeLiveCaps();
+    expect(line).toContain(`maxFunctions=${LIVE_MAX_FUNCTIONS}`);
+    expect(line).toContain(`candidateCap=${LIVE_CANDIDATE_CAP}`);
+  });
+});
+
 describe('AnalysisService.runJob', () => {
   const job = { _id: { toString: () => 'job-1' }, owner: 'cline', name: 'cline', ref: null };
 
-  it('runs the CAPPED pipeline and records honest analysed/total counts', async () => {
+  it('drives the pipeline with the configured candidate cap and the true total', async () => {
     const { service, mocks } = makeService({
       findById: job,
-      extract: { functions: functionsOfLength(300), commit: 'abc1234' },
+      extract: { functions: functionsOfLength(120), commit: 'abc1234' },
       run: { repoId: REPO_ID },
     });
 
     await service.runJob('job-1');
 
-    // The pipeline was driven with the live caps and the true total.
     const runArgs = mocks.run.mock.calls[0][0];
     expect(runArgs).toMatchObject({
       owner: 'cline',
       name: 'cline',
       commit: 'abc1234',
-      maxFunctions: LIVE_MAX_FUNCTIONS,
       candidateCap: LIVE_CANDIDATE_CAP,
-      functionsTotal: 300,
+      functionsTotal: 120,
     });
-    expect(runArgs.functions).toHaveLength(300);
-
-    // Analysed is capped at 250; total is the pre-cap 300.
+    expect(runArgs.functions).toHaveLength(120);
+    // Nothing is truncated on the live path — anything over the limit is
+    // refused outright, so no maxFunctions cap is handed to the pipeline.
+    expect(runArgs.maxFunctions).toBeUndefined();
     expect(mocks.markRunning).toHaveBeenCalledWith('job-1');
-    expect(mocks.markDone).toHaveBeenCalledWith(
-      'job-1',
-      expect.objectContaining({ functionsAnalyzed: LIVE_MAX_FUNCTIONS, functionsTotal: 300 })
-    );
     expect(mocks.markFailed).not.toHaveBeenCalled();
   });
 
-  it('reports analyzed == total for a repo under the cap', async () => {
+  it('reports analyzed == total on every successful run', async () => {
     const { service, mocks } = makeService({
       findById: job,
-      extract: { functions: functionsOfLength(42), commit: 'abc1234' },
+      extract: { functions: functionsOfLength(1337), commit: 'abc1234' },
     });
 
     await service.runJob('job-1');
 
     expect(mocks.markDone).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ functionsAnalyzed: 42, functionsTotal: 42 })
+      expect.objectContaining({ functionsAnalyzed: 1337, functionsTotal: 1337 })
     );
   });
 
-  it('refuses an oversized repo before any paid stage runs', async () => {
+  it('refuses a repo above the live limit before any paid stage runs', async () => {
+    const over = LIVE_MAX_FUNCTIONS + 1;
     const { service, mocks } = makeService({
       findById: job,
-      extract: { functions: functionsOfLength(LIVE_HARD_CEILING + 1), commit: 'abc1234' },
+      extract: { functions: functionsOfLength(over), commit: 'abc1234' },
     });
 
     await service.runJob('job-1');
@@ -185,10 +189,22 @@ describe('AnalysisService.runJob', () => {
     expect(mocks.run).not.toHaveBeenCalled();
     expect(mocks.markFailed).toHaveBeenCalledWith(
       'job-1',
-      expect.stringMatching(/too large/i),
-      LIVE_HARD_CEILING + 1
+      expect.stringContaining(`above the current live limit of ${LIVE_MAX_FUNCTIONS}`),
+      over
     );
     expect(mocks.markDone).not.toHaveBeenCalled();
+  });
+
+  it('analyses a repo exactly at the limit', async () => {
+    const { service, mocks } = makeService({
+      findById: job,
+      extract: { functions: functionsOfLength(LIVE_MAX_FUNCTIONS), commit: 'abc1234' },
+    });
+
+    await service.runJob('job-1');
+
+    expect(mocks.run).toHaveBeenCalled();
+    expect(mocks.markFailed).not.toHaveBeenCalled();
   });
 
   it('marks the job failed with a safe message when the pipeline throws', async () => {
