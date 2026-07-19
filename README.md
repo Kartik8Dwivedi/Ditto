@@ -14,6 +14,8 @@
 
 <p align="center">
   🔗 <a href="https://ditto-flax.vercel.app"><strong>Live demo</strong></a> ·
+  <a href="https://youtu.be/I5oH0Xod-eA"><strong>Demo video</strong></a> ·
+  <a href="https://drive.google.com/file/d/16IN3RclBcb-7DpKR65jmUe79RSbhImrv/view?usp=sharing">Pitch deck</a> ·
   <a href="https://ditto-backend-1016629498190.asia-south2.run.app">API</a> ·
   <a href="#run-it-yourself">Run it yourself</a> ·
   <a href="#contribute">Contribute</a>
