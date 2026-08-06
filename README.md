@@ -21,6 +21,17 @@
   <a href="#contribute">Contribute</a>
 </p>
 
+<!-- TODO(Kartik): set the real public repo slug in the two badge URLs below (currently kartik8dwivedi/ditto). -->
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
+  <a href="https://github.com/kartik8dwivedi/ditto/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/kartik8dwivedi/ditto/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Functions analysed" src="https://img.shields.io/badge/functions_analysed-5%2C897-blue">
+  <img alt="Proven by execution" src="https://img.shields.io/badge/proven_by_execution-18-red">
+  <img alt="JS / TS" src="https://img.shields.io/badge/JS%20%2F%20TS-ts--morph-3178c6">
+</p>
+
+<!-- TODO(Kartik): record a 15-20s GIF of the analyse flow and embed it here — it converts far better than a static hero. -->
+
 ---
 
 ## You've had this code review
@@ -99,6 +110,8 @@ Both are pure functions. Ditto lifted them out of the repo, ran them in a sandbo
 The bug is a reserved-space calculation: `budget-projection` subtracts the length of its own truncation notice from the budget, and once the limit exceeds 16 the notice eats the entire allowance, leaving a single character. Ditto generated the boundary inputs itself — 0, −1, 5, 16, 17, 20 — and the pair agrees at 16 and diverges at 17. It found the exact edge without being told where to look.
 
 `jscpd` reports **0 clones** across these files. They share almost no tokens. But they're supposed to do the same job, and one of them is silently wrong.
+
+**Check it against the source yourself**, pinned at commit [`c564045`](https://github.com/cline/cline/tree/c564045d8135c0c1c330b21d47b68b74917ce614): the correct [`compaction-shared.ts` L70–75](https://github.com/cline/cline/blob/c564045d8135c0c1c330b21d47b68b74917ce614/sdk/packages/core/src/extensions/context/compaction-shared.ts#L70-L75) versus the broken [`budget-projection/project.ts` L329–343](https://github.com/cline/cline/blob/c564045d8135c0c1c330b21d47b68b74917ce614/sdk/packages/core/src/extensions/context/budget-projection/project.ts#L329-L343), where the marker-reservation math collapses the kept text to a single character for limits of roughly 17–25. There are in fact **four** functions literally named `truncateText` in that package, plus a `truncateMessageText` sibling — each an independent reimplementation.
 
 ---
 
@@ -292,7 +305,7 @@ We also note [arXiv 2509.25754](https://arxiv.org/abs/2509.25754) — classical 
 
 ## Roadmap
 
-- **Ditto Guard** — the prevention half. A PR check that fingerprints only the functions the diff *adds* and asks whether the repo already knows how to do that. Costs about **$0.01 per PR**, because it never re-analyses the repo. The API endpoint exists; the GitHub Action is next.
+- **Ditto Guard** — the prevention half, now implemented. A PR check that fingerprints only the functions the diff *adds*, asks whether the repo already knows how to do that, and — when the match is a pure function — executes both to prove they diverge. Costs about **$0.01 per PR**, because it never re-analyses the repo. It ships as a [GitHub Action](ditto-guard-action/) over `POST /api/v1/pr` (with index-if-absent, a head-SHA result cache, and a per-IP daily budget). Enabling it on the *hosted* demo is a deploy away — the live instance needs a server-side `GITHUB_TOKEN` set.
 - **Agent pre-flight via MCP** — expose the index as an MCP tool so a coding agent can ask *"does this already exist?"* **before** it writes the duplicate. Fixing the problem at the source beats catching it in review.
 - **More languages** — swap `ts-morph` for `tree-sitter` and the same pipeline covers Python, Go, and Java. The AST layer is the only language-specific part; fingerprinting, clustering, and adjudication are language-agnostic.
 - **Incremental re-indexing** — fingerprints are already cached by body hash, so re-analysis is nearly free. The missing piece is a CI job that re-indexes only what a commit touched.
@@ -323,6 +336,8 @@ Issues and pull requests are welcome and will be read by humans who are glad you
 - **Frontend** — Next.js 16 + React 19 + Tailwind 4 → Vercel.
 - **Models** — OpenAI `gpt-5.4-nano` (fingerprints), `gpt-5.6-terra` (adjudication), `text-embedding-3-small`. Structured Outputs throughout: every model response is Zod-validated, with no free-text JSON parsing anywhere.
 - **Sandbox** — `worker_threads` + `vm`, no network, no filesystem, no `require`, 1-second timeout per call.
+
+**Deep dives:** [DESIGN.md](DESIGN.md) — architecture decisions and the sandbox threat model · [MODELS.md](MODELS.md) — models and the cost split · [backend/eval/](backend/eval/) — the labelled benchmark that measures the similarity thresholds (precision / recall / F1).
 
 ## How we built this
 
