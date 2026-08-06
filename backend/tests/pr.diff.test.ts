@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -18,7 +18,7 @@ import {
 
 const FIXTURE = (name: string): PrFile[] =>
   JSON.parse(
-    readFileSync(path.resolve('.cache/pr-probe', name), 'utf8')
+    readFileSync(fileURLToPath(new URL(`./fixtures/pr-probe/${name}`, import.meta.url)), 'utf8')
   ) as PrFile[];
 
 describe('addedRanges', () => {

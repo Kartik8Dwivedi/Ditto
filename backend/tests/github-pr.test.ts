@@ -1,6 +1,8 @@
+import { fileURLToPath } from 'node:url';
+
 import { describe, it, expect } from 'vitest';
 
-import HttpGithubPrClient, { PR_CACHE_DIR } from '../src/Services/pr/github-pr.js';
+import HttpGithubPrClient from '../src/Services/pr/github-pr.js';
 
 /**
  * The GitHub PR REST client, and Stage B's token rule.
@@ -13,7 +15,9 @@ import HttpGithubPrClient, { PR_CACHE_DIR } from '../src/Services/pr/github-pr.j
  * sets none.
  */
 describe('HttpGithubPrClient', () => {
-  const client = new HttpGithubPrClient(PR_CACHE_DIR);
+  // Read from the tracked test fixtures, not the gitignored .cache, so the suite
+  // is hermetic in CI (no token, no network — a cache HIT never needs a token).
+  const client = new HttpGithubPrClient(fileURLToPath(new URL('./fixtures/pr-probe/', import.meta.url)));
 
   it('serves cached PR changed-files with NO token (fixtures need no GITHUB_TOKEN)', async () => {
     const files = await client.getChangedFiles('cline', 'cline', 12068);

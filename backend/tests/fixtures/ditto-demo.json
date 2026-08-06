@@ -1,0 +1,175 @@
+{
+  "owner": "ditto",
+  "name": "demo",
+  "commit": "fixture0000000000000000000000000000000000",
+  "functions": [
+    {
+      "name": "normalizePhone",
+      "file": "src/common/phone.ts",
+      "startLine": 8,
+      "endLine": 15,
+      "signature": "export function normalizePhone(input: unknown): string",
+      "body": "export function normalizePhone(input) {\n  if (input === null || input === undefined) return '';\n  const digits = String(input).replace(/[^\\d]/g, '');\n  if (digits.length === 14 && digits.startsWith('0091')) return digits.slice(4);\n  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);\n  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);\n  return digits;\n}",
+      "bodyHash": "ece65e38e1434a388ec2640ec8c61599ff45ad4d7fd530d2a0ed95ed93c904a0",
+      "loc": 8,
+      "isExported": true,
+      "params": [
+        "input"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "formatMobile",
+      "file": "src/checkout/contact.ts",
+      "startLine": 22,
+      "endLine": 29,
+      "signature": "export const formatMobile: (value: unknown) => string",
+      "body": "export const formatMobile = (value) => {\n  const text = value === null || value === undefined ? '' : String(value);\n  const kept = text\n    .split('')\n    .filter((character) => character >= '0' && character <= '9')\n    .join('');\n  return kept.length > 10 ? kept.substring(kept.length - 10) : kept;\n}",
+      "bodyHash": "4590bfbb88e1082a0bc6c3603201797ccef99bfa25abc5d210cdabf4a46d660e",
+      "loc": 8,
+      "isExported": true,
+      "params": [
+        "value"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "sanitizeMobile",
+      "file": "src/auth/signup.ts",
+      "startLine": 41,
+      "endLine": 54,
+      "signature": "export function sanitizeMobile(mobile: unknown): string",
+      "body": "export function sanitizeMobile(mobile) {\n  const text = mobile == null ? '' : `${mobile}`;\n  let out = '';\n  for (let i = 0; i < text.length; i += 1) {\n    const code = text.charCodeAt(i);\n    if (code >= 48 && code <= 57) {\n      out += text[i];\n    }\n  }\n  while (out.length > 10) {\n    out = out.slice(1);\n  }\n  return out;\n}",
+      "bodyHash": "6a16d3dcf80bbd8eb9ed33926a7872b1da508c3cdc02c7c2b2404071cb4e4e05",
+      "loc": 14,
+      "isExported": true,
+      "params": [
+        "mobile"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "cleanNumber",
+      "file": "src/billing/invoice.ts",
+      "startLine": 15,
+      "endLine": 20,
+      "signature": "export function cleanNumber(raw: unknown): string",
+      "body": "export function cleanNumber(raw) {\n  const digits = String(raw ?? '').replace(/\\D/g, '');\n  // Drop the international dialling prefix if the caller included one.\n  const withoutIddPrefix = digits.replace(/^0+/, '');\n  return withoutIddPrefix;\n}",
+      "bodyHash": "9285d139d2b5cd764fc19a55b012c81e25db58fe84d3f1a0c8d64c4510686ab8",
+      "loc": 6,
+      "isExported": true,
+      "params": [
+        "raw"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "saveUser",
+      "file": "src/auth/repository.ts",
+      "startLine": 12,
+      "endLine": 16,
+      "signature": "export async function saveUser(user: User): Promise<void>",
+      "body": "export async function saveUser(user) {\n  const record = { ...user, id: randomUUID(), createdAt: new Date().toISOString() };\n  await db.collection('users').insertOne(record);\n  logger.info('user saved', record.id);\n}",
+      "bodyHash": "2b1e0cc261529f3f15822147dc174f4563fbaf24c5502802dd74cd60550bb3da",
+      "loc": 5,
+      "isExported": true,
+      "params": [
+        "user"
+      ],
+      "returnTypeText": "Promise<void>",
+      "imports": [
+        "./db",
+        "node:crypto"
+      ],
+      "callsExternal": true,
+      "isPure": false
+    },
+    {
+      "name": "persistUser",
+      "file": "src/admin/users.ts",
+      "startLine": 30,
+      "endLine": 37,
+      "signature": "export async function persistUser(payload: User): Promise<void>",
+      "body": "export async function persistUser(payload) {\n  const row = Object.assign({}, payload, {\n    id: randomUUID(),\n    createdAt: new Date().toISOString(),\n  });\n  await db.collection('users').insertOne(row);\n  logger.info('user saved', row.id);\n}",
+      "bodyHash": "cfaa19ff71ba21e57523a9adee85b437fb9fdccafc9db127ffe36d8b3ac8bacd",
+      "loc": 8,
+      "isExported": true,
+      "params": [
+        "payload"
+      ],
+      "returnTypeText": "Promise<void>",
+      "imports": [
+        "./db",
+        "node:crypto"
+      ],
+      "callsExternal": true,
+      "isPure": false
+    },
+    {
+      "name": "slugify",
+      "file": "src/utils/text.ts",
+      "startLine": 3,
+      "endLine": 9,
+      "signature": "export function slugify(title: string): string",
+      "body": "export function slugify(title) {\n  return String(title)\n    .toLowerCase()\n    .trim()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '');\n}",
+      "bodyHash": "3edd898fddd87cc06ef414ea00ea0940c6d5644c89b40b8bc25aeaacafe6f979",
+      "loc": 7,
+      "isExported": true,
+      "params": [
+        "title"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "toTitleCase",
+      "file": "src/utils/text.ts",
+      "startLine": 14,
+      "endLine": 19,
+      "signature": "export function toTitleCase(sentence: string): string",
+      "body": "export function toTitleCase(sentence) {\n  return String(sentence)\n    .split(' ')\n    .map((word) => (word ? word[0].toUpperCase() + word.slice(1).toLowerCase() : word))\n    .join(' ');\n}",
+      "bodyHash": "666d0c3736ea0f4b1b2d269cb8d8cac44f00243f92c2913bddff775f0405d708",
+      "loc": 6,
+      "isExported": true,
+      "params": [
+        "sentence"
+      ],
+      "returnTypeText": "string",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    },
+    {
+      "name": "clampPercent",
+      "file": "src/utils/number.ts",
+      "startLine": 5,
+      "endLine": 8,
+      "signature": "export function clampPercent(value: number): number",
+      "body": "export function clampPercent(value) {\n  if (Number.isNaN(value)) return 0;\n  return Math.min(100, Math.max(0, value));\n}",
+      "bodyHash": "23068aed742a6b5c0a47d7c1dda4c3dcb85519fd6e8d71de4d2bc7f434b6b93f",
+      "loc": 4,
+      "isExported": true,
+      "params": [
+        "value"
+      ],
+      "returnTypeText": "number",
+      "imports": [],
+      "callsExternal": false,
+      "isPure": true
+    }
+  ]
+}
