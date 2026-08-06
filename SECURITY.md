@@ -10,7 +10,7 @@ Please **do not** open a public issue for a security vulnerability.
 
 Instead, report it privately via GitHub's
 [**Report a vulnerability**](../../security/advisories/new) flow (Security → Advisories),
-or by email to **[INSERT-YOUR-CONTACT-EMAIL]**.
+or by email to **[codewithme.kartik@gmail.com]**.
 
 Please include a description, reproduction steps, and the impact you expect. We aim to
 acknowledge within 72 hours and to keep you updated as we work on a fix.
