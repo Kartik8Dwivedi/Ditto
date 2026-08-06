@@ -43,7 +43,8 @@ export function liveMaxFunctions(): number {
 
 /** Source, so anyone can run the pipeline unrestricted. */
 // TODO: confirm final public repo URL
-export const GITHUB_REPO_URL = 'https://github.com/kartik8dwivedi/ditto';
+// Assumes the repo is renamed to "ditto" (Settings → rename). Update if you pick another name.
+export const GITHUB_REPO_URL = 'https://github.com/Kartik8Dwivedi/ditto';
 
 export type SuggestedRepo = {
   /** Full GitHub URL — pasted verbatim into the analyse box. */

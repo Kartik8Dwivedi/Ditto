@@ -1,0 +1,48 @@
+name: "🐛 Bug report"
+description: "Something in Ditto (the pipeline, the API, or the UI) behaved incorrectly."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Ran `npm run pipeline -- owner/name` / pasted this repo URL …
+        2. …
+        3. Saw …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Indexer / extraction (ts-morph)
+        - Pipeline (fingerprint / embed / cluster / adjudicate / probe)
+        - Per-PR analysis (Ditto Guard)
+        - API / backend
+        - Frontend / UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Node version, OS, and whether you were on the hosted demo or a local run.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Any relevant output. Please redact secrets.
+      render: shell

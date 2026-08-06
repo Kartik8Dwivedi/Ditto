@@ -21,16 +21,23 @@
   <a href="#contribute">Contribute</a>
 </p>
 
-<!-- TODO(Kartik): set the real public repo slug in the two badge URLs below (currently kartik8dwivedi/ditto). -->
+<!-- Badge URLs assume the repo is renamed to "ditto" (Settings → rename). If you pick another name, update the slug in the CI badge below. -->
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
-  <a href="https://github.com/kartik8dwivedi/ditto/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/kartik8dwivedi/ditto/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/Kartik8Dwivedi/ditto/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Kartik8Dwivedi/ditto/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Functions analysed" src="https://img.shields.io/badge/functions_analysed-5%2C897-blue">
   <img alt="Proven by execution" src="https://img.shields.io/badge/proven_by_execution-18-red">
   <img alt="JS / TS" src="https://img.shields.io/badge/JS%20%2F%20TS-ts--morph-3178c6">
 </p>
 
-<!-- TODO(Kartik): record a 15-20s GIF of the analyse flow and embed it here — it converts far better than a static hero. -->
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=I5oH0Xod-eA">
+    <img alt="Watch the Ditto demo" src="https://img.youtube.com/vi/I5oH0Xod-eA/maxresdefault.jpg" width="640">
+  </a>
+  <br/><sub>▶ Watch the 3-minute demo</sub>
+</p>
+
+<!-- TODO(Kartik): a short autoplaying GIF of the analyse flow converts even better than a video thumbnail — record one (~15-20s) and add it above. -->
 
 ---
 

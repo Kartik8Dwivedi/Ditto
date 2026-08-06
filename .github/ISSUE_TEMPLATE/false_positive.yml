@@ -1,0 +1,50 @@
+name: "🎯 Report a false positive"
+description: "Ditto flagged two functions as the same behaviour, but they aren't. This is the most valuable report you can file."
+title: "[False positive]: "
+labels: ["false-positive", "precision"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Precision is the thing we care most about. A cluster Ditto got wrong tells us
+        exactly what the heuristics missed — thank you for taking the time.
+  - type: input
+    id: repo
+    attributes:
+      label: Repository analysed
+      description: The repo (and commit/branch if you have it) where the false cluster appeared.
+      placeholder: owner/name @ commit
+    validations:
+      required: true
+  - type: textarea
+    id: functions
+    attributes:
+      label: The functions Ditto grouped together
+      description: Names + file paths of the functions it clustered, and (ideally) their bodies.
+      placeholder: |
+        - `parseAmount` — src/money/parse.ts
+        - `readPrice`  — src/cart/price.ts
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why they are NOT the same behaviour
+      description: What does each one actually do differently?
+    validations:
+      required: true
+  - type: dropdown
+    id: proof
+    attributes:
+      label: How did Ditto label it?
+      options:
+        - "Proven by execution (red)"
+        - "Suspected / predicted (amber)"
+        - "Not sure"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link to the cluster (optional)
+      description: The Ditto URL for the cluster/analysis, if you have it.
