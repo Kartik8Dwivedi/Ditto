@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import GuardService from '../src/Services/guard.service.js';
-import { buildEmbedText } from '../src/Services/embedding.service.js';
+import { buildEmbedText, EMBED_VERSION } from '../src/Services/embedding.service.js';
 import type { Fingerprint } from '../src/Models/contracts.js';
 
 /**
@@ -30,6 +30,9 @@ const existingDoc = (id: string, name: string, embedding: number[]) => ({
   params: ['s'],
   fingerprint: phoneFingerprint,
   embedding,
+  // The stored index vector was built under the CURRENT recipe — the guard
+  // refuses to cosine-compare against a stale index (see the stale-index test).
+  embedVersion: EMBED_VERSION,
 });
 
 const incoming = {
@@ -193,5 +196,70 @@ describe('GuardService.check', () => {
     await expect(
       new GuardService(deps).check({ owner: 'o', name: 'r', functions: [incoming] })
     ).rejects.toThrow(/not been indexed/);
+  });
+
+  it('does NOT reuse a cross-repo cached embedding built under a STALE recipe — it recomputes', async () => {
+    // A content-addressed cache hit (same bodyHash, different repo) whose vector
+    // was built under an OLDER recipe. `findCachedDerivations` is unscoped across
+    // repos, so this is exactly the poison the guard must refuse to reuse.
+    const hash = hashOf(incoming.body);
+    const staleEmbedding = [0, 1, 0]; // orthogonal to the current index vector
+    const embedAllSpy = vi
+      .fn()
+      // Simulate the recompute: hand back a CURRENT-recipe vector, not the stale one.
+      .mockResolvedValue({ byHash: new Map([[hash, [1, 0, 0]]]) });
+
+    const deps = {
+      repoRepository: { findLatest: vi.fn().mockResolvedValue(repo) } as never,
+      functionRepository: {
+        // Stored index is current-recipe, so the comparison itself is legitimate.
+        findByRepo: vi.fn().mockResolvedValue([existingDoc('fn-1', 'normalizePhone', [1, 0, 0])]),
+        findCachedDerivations: vi.fn().mockResolvedValue([
+          {
+            bodyHash: hash,
+            fingerprint: phoneFingerprint,
+            embedding: staleEmbedding,
+            embedVersion: 'v1-old-recipe',
+          },
+        ]),
+      } as never,
+      clusterRepository: { findByRepo: vi.fn().mockResolvedValue([]) } as never,
+      fingerprintService: {
+        fingerprintAll: vi.fn().mockResolvedValue({ byHash: new Map([[hash, phoneFingerprint]]) }),
+      } as never,
+      embeddingService: { embedAll: embedAllSpy } as never,
+      adjudicateService: {
+        adjudicate: vi.fn().mockResolvedValue({
+          memberIds: ['incoming', 'fn-1'],
+          canonicalId: 'fn-1',
+          confidence: 0.96,
+          disagreementRisk: 'semantic',
+          differences: [],
+          behaviorSummary: 'phone normalisation',
+          domain: 'phone-number',
+          probeInputs: [],
+        }),
+      } as never,
+    };
+
+    await new GuardService(deps).check({ owner: 'o', name: 'r', functions: [incoming] });
+
+    // THE ASSERTION: the stale vector must never enter the embedding-reuse cache,
+    // so embedAll is forced to recompute it under the current recipe.
+    const reuseCache = embedAllSpy.mock.calls[0][1] as Map<string, number[]>;
+    expect(reuseCache.get(hash)).toBeUndefined();
+    expect(reuseCache.has(hash)).toBe(false);
+  });
+
+  it('refuses (does not silently compare) when the stored index is a STALE recipe', async () => {
+    // The repo was indexed under an older embed recipe. Cosine across recipes is
+    // meaningless, and rebuilding the index is the pipeline's job — so guard must
+    // fail loud rather than return a garbage similarity.
+    const stale = { ...existingDoc('fn-1', 'normalizePhone', [1, 0, 0]), embedVersion: 'v1-old' };
+    const { deps } = makeDeps({ repo, existing: [stale], embedding: [1, 0, 0], adjudicate: null });
+
+    await expect(
+      new GuardService(deps).check({ owner: 'o', name: 'r', functions: [incoming] })
+    ).rejects.toThrow(/embedding recipe/);
   });
 });
