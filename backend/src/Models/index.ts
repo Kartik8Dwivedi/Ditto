@@ -11,6 +11,9 @@ export type { IJob } from './job.model.js';
 export { default as PrAnalysisModel } from './prAnalysis.model.js';
 export type { IPrAnalysis } from './prAnalysis.model.js';
 
+export { default as ApiQuotaModel } from './apiQuota.model.js';
+export type { IApiQuota, QuotaBucket } from './apiQuota.model.js';
+
 export {
   ExtractedFunctionSchema,
   ExtractorCacheFileSchema,

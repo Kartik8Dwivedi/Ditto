@@ -70,11 +70,25 @@ export class HttpGithubPrClient implements GithubPrClient {
       /* not cached yet */
     }
 
+    // A LIVE fetch is about to happen (nothing cached). The PR REST endpoints
+    // have NO codeload fallback, and anonymous is GitHub's 60/hr shared across
+    // Cloud Run's NAT IP — effectively unusable in production. So Stage B makes a
+    // token REQUIRED here, failing with an actionable message instead of a
+    // mystery 403/rate-limit later. Cache HITS never reach this line, so the
+    // pr-probe fixtures (and the tests that use them) need no token.
+    if (!AppConfig.GITHUB_TOKEN) {
+      throw new AppError(
+        'A GITHUB_TOKEN is required to fetch pull-request data from GitHub. ' +
+          'Set GITHUB_TOKEN in the environment (a fine-grained token with public-repo read access is enough) and retry.',
+        StatusCodes.SERVICE_UNAVAILABLE
+      );
+    }
+
     const headers: Record<string, string> = {
       'user-agent': 'ditto-pr-agent',
       accept: 'application/vnd.github+json',
+      authorization: `Bearer ${AppConfig.GITHUB_TOKEN}`,
     };
-    if (AppConfig.GITHUB_TOKEN) headers.authorization = `Bearer ${AppConfig.GITHUB_TOKEN}`;
 
     const res = await fetch(url, { headers });
     if (!res.ok) {

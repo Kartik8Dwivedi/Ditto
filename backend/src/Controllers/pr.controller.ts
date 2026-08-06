@@ -20,11 +20,13 @@ const prService = new PrService();
  */
 export const createPr = async (req: Request, res: Response): Promise<void> => {
   const input = parsePrInput(req.body as CreatePrBody);
-  const result = await prService.submit(input);
+  // req.ip is the REAL client IP behind Cloud Run (app.ts sets trust proxy=1);
+  // it keys the per-IP/day spend budget.
+  const result = await prService.submit(input, req.ip);
   sendSuccess(res, {
     statusCode: StatusCodes.ACCEPTED,
     data: result,
-    message: result.jobId ? 'PR analysis complete' : 'PR already analysed',
+    message: result.jobId ? 'PR analysis submitted' : 'PR already analysed',
   });
 };
 

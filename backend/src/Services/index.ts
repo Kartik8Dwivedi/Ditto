@@ -49,11 +49,15 @@ export type { CacheFile, ExtractResult, IndexOptions, IndexReport } from './inde
 
 export { default as TasksService } from './tasks.service.js';
 
+export { default as QuotaService, dayKey } from './quota.service.js';
+
 export {
-  default as AnalysisService,
+  runLiveIndex,
   LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP,
-  LIVE_ANALYSIS_CAP,
   describeLiveCaps,
-} from './analysis.service.js';
+} from './live-index.js';
+export type { LiveIndexOptions, LiveIndexResult } from './live-index.js';
+
+export { default as AnalysisService } from './analysis.service.js';
 export type { AnalyzeResult } from './analysis.service.js';

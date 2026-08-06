@@ -8,3 +8,4 @@ export { default as ClusterRepository } from './cluster.repository.js';
 export { default as JobRepository } from './job.repository.js';
 export type { JobDocument } from './job.repository.js';
 export { default as PrAnalysisRepository } from './prAnalysis.repository.js';
+export { default as ApiQuotaRepository } from './apiQuota.repository.js';

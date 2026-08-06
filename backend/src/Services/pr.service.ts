@@ -1,7 +1,14 @@
+import { StatusCodes } from 'http-status-codes';
+
 import FingerprintService from './fingerprint.service.js';
 import EmbeddingService, { EMBED_VERSION } from './embedding.service.js';
 import AdjudicateService from './adjudicate.service.js';
 import ProbeService from './probe.service.js';
+import IndexerService from './indexer/indexer.service.js';
+import PipelineService from './pipeline.service.js';
+import TasksService from './tasks.service.js';
+import QuotaService from './quota.service.js';
+import { runLiveIndex } from './live-index.js';
 import {
   cosineSimilarity,
   isCompatible,
@@ -23,6 +30,7 @@ import {
   JobRepository,
   PrAnalysisRepository,
 } from '../Repository/index.js';
+import AppConfig from '../Config/AppConfig.js';
 import logger from '../Config/logger.js';
 import { ConflictError } from '../Utils/errors/AppError.js';
 import AppError from '../Utils/errors/AppError.js';
@@ -84,6 +92,12 @@ interface PrServiceDeps {
   githubPr?: GithubPrClient;
   /** Injectable for tests — the real one hits GitHub's tarball endpoint. */
   fetchRepoFiles?: RepoFileFetcher;
+  /** Index-if-absent (Stage B): the base-repo indexer + pipeline. */
+  indexerService?: IndexerService;
+  pipelineService?: PipelineService;
+  /** Async queueing + per-IP/day spend budget for the public path. */
+  tasksService?: TasksService;
+  quotaService?: QuotaService;
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100;
@@ -135,6 +149,10 @@ class PrService {
   private readonly probeService: ProbeService;
   private readonly githubPr: GithubPrClient;
   private readonly fetchRepoFiles: RepoFileFetcher;
+  private readonly indexerService: IndexerService;
+  private readonly pipelineService: PipelineService;
+  private readonly tasksService: TasksService;
+  private readonly quotaService: QuotaService;
 
   constructor({
     repoRepository = new RepoRepository(),
@@ -148,6 +166,10 @@ class PrService {
     probeService = new ProbeService(),
     githubPr = new HttpGithubPrClient(),
     fetchRepoFiles: fetcher = fetchRepoFiles,
+    indexerService = new IndexerService(),
+    pipelineService = new PipelineService(),
+    tasksService = new TasksService(),
+    quotaService = new QuotaService(),
   }: PrServiceDeps = {}) {
     this.repoRepository = repoRepository;
     this.functionRepository = functionRepository;
@@ -160,65 +182,201 @@ class PrService {
     this.probeService = probeService;
     this.githubPr = githubPr;
     this.fetchRepoFiles = fetcher;
+    this.indexerService = indexerService;
+    this.pipelineService = pipelineService;
+    this.tasksService = tasksService;
+    this.quotaService = quotaService;
   }
 
   /**
-   * Submit a PR for analysis.
+   * Submit a PR for analysis. Works on ANY public repo now (Stage B), and is safe
+   * to expose publicly.
    *
-   * Runs synchronously (a PR adds a handful of functions, so this is fast like
-   * Guard's /check) but ALSO drives a Job through the same stages the frontend
-   * poll renders, so `GET /jobs/:id` works unchanged. A dedup hit (same headSha
-   * already analysed) returns the stored analysis for ₹0 and creates no job.
+   *   1. Resolve the PR head SHA (the dedup key + the code the PR proposes).
+   *   2. CACHE SHORT-CIRCUIT: a re-check of the same head SHA returns the stored
+   *      analysis for ₹0 — before any quota is charged and before any expensive
+   *      GitHub/OpenAI work.
+   *   3. If the base repo is ALREADY indexed → the fast SYNCHRONOUS Stage-A path:
+   *      charge the loose per-IP/day PR budget, check the PR inline, return the
+   *      finished analysis.
+   *   4. If the base repo is NOT indexed → the async INDEX-IF-ABSENT path: charge
+   *      the tight per-IP/day INDEX budget, queue a job that first indexes the
+   *      base repo then checks the PR. Returns `{ jobId }` to poll; the ONE
+   *      GET /jobs/:id endpoint drives it, and on `done` sets `prAnalysisId`.
+   *
+   * `ip` is the real client IP (req.ip, correct behind Cloud Run's proxy). It
+   * keys the quota. The dedup hit is charged nothing.
    */
-  async submit(input: PrAnalyzeInput): Promise<PrSubmitResult> {
-    // Stage A: the base repo must already be indexed. (Stage B adds index-if-absent.)
-    const repo = await this.repoRepository.findLatest(input.owner, input.name);
-    if (!repo) {
-      throw new ConflictError(
-        `${input.owner}/${input.name} is not indexed yet — analyze the repo first, then re-run the PR check.`
-      );
-    }
-
+  async submit(input: PrAnalyzeInput, ip?: string): Promise<PrSubmitResult> {
+    // resolvePull is a single cheap, disk-cached GitHub metadata call — the
+    // minimum needed to compute the dedup key. The expensive fetches (changed
+    // files, PR-head tarball) and every OpenAI call come strictly AFTER the cache
+    // check and the quota charge below.
     const meta = await this.githubPr.resolvePull(input.owner, input.name, input.prNumber);
 
-    // Dedup on head commit: the same code proposed again is the same answer.
+    // CACHE by head SHA: the same code proposed again is the same answer. Returns
+    // BEFORE any quota is consumed and before any changed-file/tarball/OpenAI work.
     const cached = await this.prAnalysisRepository.findByHeadSha(meta.headSha);
     if (cached) {
       logger.info(`PR dedup hit for ${input.owner}/${input.name} @ ${meta.headSha.slice(0, 7)}`);
       return { jobId: null, prAnalysisId: cached._id.toString() };
     }
 
+    const repo = await this.repoRepository.findLatest(input.owner, input.name);
+
+    // ---- FAST SYNC PATH (Stage A): base repo already indexed ----
+    if (repo) {
+      // A PR check on an existing index is cheap — the loose PR budget.
+      await this.quotaService.consume(ip, 'pr');
+
+      const job = await this.jobRepository.create({
+        owner: input.owner,
+        name: input.name,
+        ref: meta.headRef,
+        status: 'running',
+        stage: 'fetch',
+        pr: this.prBlock(meta, false),
+      });
+      const jobId = job._id.toString();
+
+      try {
+        const onStage: StageReporter = (stage) => this.jobRepository.setStage(jobId, stage);
+        const analysis = await this.analyze(repo, meta, onStage);
+        await this.jobRepository.setPrChangedFunctions(jobId, analysis.changedFunctions);
+        await this.jobRepository.markPrDone(jobId, analysis._id);
+        logger.success(
+          `PR analysis done for ${input.owner}/${input.name} #${meta.prNumber} → ` +
+            `${analysis.findings.length} findings on ${analysis.changedFunctions} changed functions`
+        );
+        return { jobId, prAnalysisId: analysis._id.toString() };
+      } catch (err) {
+        const message = err instanceof AppError ? err.message : 'PR analysis failed unexpectedly.';
+        await this.jobRepository.markFailed(jobId, message);
+        throw err;
+      }
+    }
+
+    // ---- ASYNC INDEX-IF-ABSENT PATH (Stage B): never seen this repo ----
+    // A full index can take minutes, so this is a queued job, not a blocking
+    // response. Charge the tight INDEX budget (a full index is the expensive one).
+    await this.quotaService.consume(ip, 'index');
+
     const job = await this.jobRepository.create({
       owner: input.owner,
       name: input.name,
-      ref: meta.headRef,
-      status: 'running',
-      stage: 'fetch',
-      pr: {
-        prNumber: meta.prNumber,
-        headSha: meta.headSha,
-        baseSha: meta.baseSha,
-        headRef: meta.headRef,
-        changedFunctions: 0,
-        indexedOnDemand: false,
-      },
+      // Index the repo's DEFAULT branch (null), like /analyze — the PR-head code
+      // is fetched separately by headSha inside analyze(). Reusable by later checks.
+      ref: null,
+      status: 'queued',
+      stage: 'queued',
+      pr: this.prBlock(meta, true),
     });
     const jobId = job._id.toString();
 
+    if (this.tasksService.isEnabled()) {
+      await this.tasksService.enqueueRun(jobId);
+    } else {
+      // Local fallback: no Cloud Tasks configured, so run the job in-process.
+      logger.warn(`Cloud Tasks not configured — running PR job ${jobId} inline (local fallback)`);
+      void this.runPrJob(jobId);
+    }
+
+    return { jobId, prAnalysisId: null };
+  }
+
+  /** The PR metadata block stored on a job. */
+  private prBlock(meta: PullMeta, indexedOnDemand: boolean): {
+    prNumber: number;
+    headSha: string;
+    baseSha: string;
+    headRef: string;
+    changedFunctions: number;
+    indexedOnDemand: boolean;
+  } {
+    return {
+      prNumber: meta.prNumber,
+      headSha: meta.headSha,
+      baseSha: meta.baseSha,
+      headRef: meta.headRef,
+      changedFunctions: 0,
+      indexedOnDemand,
+    };
+  }
+
+  /**
+   * The async worker for an INDEX-IF-ABSENT PR job (Stage B). Cloud Tasks pushes
+   * it here via AnalysisService.runJob (which delegates any job carrying a `pr`
+   * block). It (1) indexes the base repo — the ONE correct use of pipeline.run —
+   * then (2) runs the PR check against that fresh index, driving the SAME job
+   * stages the poll renders and setting `prAnalysisId` on completion.
+   *
+   * Never throws: a failure becomes a `failed` job with a client-safe reason, so
+   * Cloud Tasks sees success and does not retry (which would re-spend).
+   */
+  async runPrJob(jobId: string): Promise<void> {
+    const job = await this.jobRepository.findById(jobId);
+    if (!job || !job.pr) {
+      logger.error(`runPrJob: no PR job ${jobId}`);
+      return;
+    }
+
+    logger.info(
+      `PR job ${jobId} (${job.owner}/${job.name} #${job.pr.prNumber}) — index-if-absent, then check`
+    );
+
+    const startedAt = Date.now();
+    const elapsedMs = (): number => Date.now() - startedAt;
+    const onStage: StageReporter = async (stage) => {
+      if (elapsedMs() > AppConfig.LIVE_DEADLINE_MS) {
+        throw new AppError(
+          `Analysis exceeded the ${Math.round(AppConfig.LIVE_DEADLINE_MS / 1000)}s live time budget ` +
+            `at the "${stage}" stage. Try a smaller repo.`,
+          StatusCodes.REQUEST_TIMEOUT
+        );
+      }
+      await this.jobRepository.setStage(jobId, stage);
+    };
+
     try {
-      const onStage: StageReporter = (stage) => this.jobRepository.setStage(jobId, stage);
+      await this.jobRepository.markRunning(jobId);
+
+      // 1. INDEX the base repo (extract → hard ceiling → capped pipeline.run).
+      const { repoId } = await runLiveIndex({
+        indexerService: this.indexerService,
+        pipelineService: this.pipelineService,
+        owner: job.owner,
+        name: job.name,
+        ref: job.ref,
+        onStage,
+      });
+      const repo = await this.repoRepository.findById(repoId);
+      if (!repo) {
+        throw new AppError(
+          'The freshly indexed repo could not be loaded for the PR check.',
+          StatusCodes.INTERNAL_SERVER_ERROR
+        );
+      }
+
+      // 2. CHECK the PR against the fresh index. prUrl is the canonical PR URL,
+      //    reconstructed so the worker needs no extra GitHub call.
+      const meta: PullMeta = {
+        prNumber: job.pr.prNumber,
+        headSha: job.pr.headSha,
+        baseSha: job.pr.baseSha,
+        headRef: job.pr.headRef,
+        prUrl: `https://github.com/${job.owner}/${job.name}/pull/${job.pr.prNumber}`,
+      };
       const analysis = await this.analyze(repo, meta, onStage);
       await this.jobRepository.setPrChangedFunctions(jobId, analysis.changedFunctions);
       await this.jobRepository.markPrDone(jobId, analysis._id);
       logger.success(
-        `PR analysis done for ${input.owner}/${input.name} #${meta.prNumber} → ` +
+        `PR job ${jobId} done for ${job.owner}/${job.name} #${job.pr.prNumber} → ` +
           `${analysis.findings.length} findings on ${analysis.changedFunctions} changed functions`
       );
-      return { jobId, prAnalysisId: analysis._id.toString() };
     } catch (err) {
       const message = err instanceof AppError ? err.message : 'PR analysis failed unexpectedly.';
+      logger.error(`PR job ${jobId} failed: ${err instanceof Error ? err.message : err}`);
       await this.jobRepository.markFailed(jobId, message);
-      throw err;
     }
   }
 

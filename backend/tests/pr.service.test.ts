@@ -172,9 +172,10 @@ describe('PrService.submit', () => {
     prUrl: 'https://github.com/o/r/pull/7',
   };
 
-  it('dedups by headSha — returns the stored analysis without a job or GitHub file fetch', async () => {
+  it('CACHE: dedups by headSha and short-circuits BEFORE quota, GitHub files, and jobs', async () => {
     const getChangedFiles = vi.fn();
     const create = vi.fn();
+    const consume = vi.fn();
     const service = new PrService({
       repoRepository: { findLatest: vi.fn().mockResolvedValue(repo) } as never,
       githubPr: {
@@ -185,23 +186,113 @@ describe('PrService.submit', () => {
         findByHeadSha: vi.fn().mockResolvedValue({ _id: { toString: () => 'pa-99' } }),
       } as never,
       jobRepository: { create } as never,
+      quotaService: { consume } as never,
     });
 
-    const result = await service.submit({ owner: 'o', name: 'r' });
+    const result = await service.submit({ owner: 'o', name: 'r' }, '1.2.3.4');
 
     expect(result).toEqual({ jobId: null, prAnalysisId: 'pa-99' });
-    expect(create).not.toHaveBeenCalled(); // no job spun up on a dedup hit
-    expect(getChangedFiles).not.toHaveBeenCalled(); // and no re-spend
+    expect(create).not.toHaveBeenCalled(); // no job spun up on a cache hit
+    expect(getChangedFiles).not.toHaveBeenCalled(); // and no re-spend on GitHub
+    expect(consume).not.toHaveBeenCalled(); // ₹0 — the daily budget is untouched
   });
 
-  it('returns a clear 409 when the base repo is not indexed yet', async () => {
-    const resolvePull = vi.fn();
+  it('INDEX-IF-ABSENT: an unindexed repo queues an index+PR job and charges the INDEX budget', async () => {
+    const create = vi.fn().mockResolvedValue({ _id: { toString: () => 'job-77' } });
+    const consume = vi.fn().mockResolvedValue(undefined);
+    const isEnabled = vi.fn().mockReturnValue(true);
+    const enqueueRun = vi.fn().mockResolvedValue(undefined);
     const service = new PrService({
       repoRepository: { findLatest: vi.fn().mockResolvedValue(null) } as never,
-      githubPr: { resolvePull, getChangedFiles: vi.fn() } as never,
+      githubPr: { resolvePull: vi.fn().mockResolvedValue(meta), getChangedFiles: vi.fn() } as never,
+      prAnalysisRepository: { findByHeadSha: vi.fn().mockResolvedValue(null) } as never,
+      jobRepository: { create } as never,
+      quotaService: { consume } as never,
+      tasksService: { isEnabled, enqueueRun } as never,
     });
 
-    await expect(service.submit({ owner: 'o', name: 'r' })).rejects.toThrow(/not indexed/);
-    expect(resolvePull).not.toHaveBeenCalled(); // fail fast before any GitHub call
+    const result = await service.submit({ owner: 'o', name: 'r' }, '5.5.5.5');
+
+    // Async: only a jobId comes back; the PR analysis is filled in on the poll.
+    expect(result).toEqual({ jobId: 'job-77', prAnalysisId: null });
+    // A full base-repo index is the expensive path → the tight INDEX budget.
+    expect(consume).toHaveBeenCalledWith('5.5.5.5', 'index');
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'o',
+        name: 'r',
+        status: 'queued',
+        stage: 'queued',
+        pr: expect.objectContaining({ indexedOnDemand: true, headSha: meta.headSha, prNumber: 7 }),
+      })
+    );
+    expect(enqueueRun).toHaveBeenCalledWith('job-77');
+  });
+
+  it('QUOTA: blocks a PR check on an indexed repo when the PR budget is spent — no job, no re-spend', async () => {
+    const getChangedFiles = vi.fn();
+    const create = vi.fn();
+    const consume = vi.fn().mockRejectedValue(new Error('Daily limit reached: PR checks'));
+    const service = new PrService({
+      repoRepository: { findLatest: vi.fn().mockResolvedValue(repo) } as never,
+      githubPr: { resolvePull: vi.fn().mockResolvedValue(meta), getChangedFiles } as never,
+      prAnalysisRepository: { findByHeadSha: vi.fn().mockResolvedValue(null) } as never,
+      jobRepository: { create } as never,
+      quotaService: { consume } as never,
+    });
+
+    await expect(service.submit({ owner: 'o', name: 'r' }, '5.5.5.5')).rejects.toThrow(/Daily limit/);
+    expect(consume).toHaveBeenCalledWith('5.5.5.5', 'pr'); // an indexed repo → the loose PR bucket
+    expect(create).not.toHaveBeenCalled();
+    expect(getChangedFiles).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrService.runPrJob (index-if-absent worker)', () => {
+  const prJobDoc = {
+    _id: { toString: () => 'job-1' },
+    owner: 'o',
+    name: 'r',
+    ref: null,
+    pr: { prNumber: 7, headSha: 'head-sha-abc', baseSha: 'base-sha-def', headRef: 'feature/x' },
+  };
+
+  it('indexes the base repo (the ONE pipeline.run), then runs the PR analysis and marks the job done', async () => {
+    const extract = vi.fn().mockResolvedValue({ functions: [{ name: 'f0' }], commit: 'c1' });
+    const run = vi.fn().mockResolvedValue({ repoId: 'repo-xyz' });
+    const markRunning = vi.fn().mockResolvedValue(undefined);
+    const setStage = vi.fn().mockResolvedValue(undefined);
+    const setPrChangedFunctions = vi.fn().mockResolvedValue(undefined);
+    const markPrDone = vi.fn().mockResolvedValue(undefined);
+    const markFailed = vi.fn().mockResolvedValue(undefined);
+    const repoDoc = { _id: { toString: () => 'repo-xyz' }, owner: 'o', name: 'r' };
+
+    const service = new PrService({
+      jobRepository: {
+        findById: vi.fn().mockResolvedValue(prJobDoc),
+        markRunning,
+        setStage,
+        setPrChangedFunctions,
+        markPrDone,
+        markFailed,
+      } as never,
+      repoRepository: { findById: vi.fn().mockResolvedValue(repoDoc) } as never,
+      indexerService: { extract } as never,
+      pipelineService: { run } as never,
+    });
+
+    // The PR analysis itself is exercised by the analyzeChangedFunctions tests
+    // above; here we stub it to keep the focus on the index→check→done wiring.
+    const analysis = { _id: { toString: () => 'pa-1' }, changedFunctions: 3, findings: [1, 2, 3] };
+    const analyzeSpy = vi.spyOn(service, 'analyze').mockResolvedValue(analysis as never);
+
+    await service.runPrJob('job-1');
+
+    // The base repo was indexed — this is the ONLY place a PR flow calls pipeline.run.
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(analyzeSpy).toHaveBeenCalled();
+    expect(setPrChangedFunctions).toHaveBeenCalledWith('job-1', 3);
+    expect(markPrDone).toHaveBeenCalledWith('job-1', analysis._id);
+    expect(markFailed).not.toHaveBeenCalled();
   });
 });
