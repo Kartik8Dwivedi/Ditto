@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 
 import FingerprintService from './fingerprint.service.js';
-import EmbeddingService from './embedding.service.js';
+import EmbeddingService, { EMBED_VERSION } from './embedding.service.js';
 import AdjudicateService from './adjudicate.service.js';
 import { cosineSimilarity, isCompatible, type ClusterableFunction } from './cluster.service.js';
 import { CONFIDENCE_THRESHOLD, moduleOf } from './stats.service.js';
 import { RepoRepository, FunctionRepository, ClusterRepository } from '../Repository/index.js';
 import logger from '../Config/logger.js';
-import { NotFoundError } from '../Utils/errors/AppError.js';
+import { NotFoundError, ConflictError } from '../Utils/errors/AppError.js';
 import type { ExtractedFunction, GuardResult, IFunction } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
 
@@ -102,13 +102,37 @@ class GuardService {
     );
     if (existing.length === 0) return { matches: [] };
 
+    // The whole check is a cosine comparison, and cosine across two different
+    // embed recipes is a meaningless number. The repo's stored index carries the
+    // recipe each vector was built under; if any is not the current recipe the
+    // index is stale (the pipeline rewrites a repo's vectors uniformly, so this is
+    // all-or-nothing). Rebuilding a whole repo's index is the pipeline's job, not
+    // the guard's — so we refuse loudly rather than return a garbage similarity.
+    if (existing.some((fn) => fn.embedVersion !== EMBED_VERSION)) {
+      throw new ConflictError(
+        `${input.owner}/${input.name} was indexed under a different embedding recipe than ` +
+          `the current one (${EMBED_VERSION}) — re-run the pipeline to rebuild its index before ` +
+          `running guard, so similarities are computed on matching vectors`
+      );
+    }
+
     // Only the new functions are fingerprinted, and a body we have already seen
     // (a reverted change, a rebase, a re-run of the check) costs nothing.
     const cached = await this.functionRepository.findCachedDerivations(
       incoming.map((fn) => fn.bodyHash)
     );
+    // A fingerprint is recipe-independent, so a cached one is always reusable.
     const cachedFingerprints = new Map(cached.map((row) => [row.bodyHash, row.fingerprint]));
-    const cachedEmbeddings = new Map(cached.map((row) => [row.bodyHash, row.embedding]));
+    // An embedding is NOT: findCachedDerivations is unscoped across repos, so a
+    // content-addressed hit can be a vector built under an OLDER recipe. Reusing
+    // it would get it cosine-compared against the current-recipe index above — a
+    // silently meaningless score. Reuse only current-recipe vectors; a stale hit
+    // is dropped so the (cheap, 1-5 function) incoming set is recomputed instead.
+    const cachedEmbeddings = new Map(
+      cached
+        .filter((row) => row.embedVersion === EMBED_VERSION)
+        .map((row) => [row.bodyHash, row.embedding])
+    );
 
     const { byHash: fingerprints } = await this.fingerprintService.fingerprintAll(
       incoming,

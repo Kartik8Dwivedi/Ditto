@@ -7,7 +7,7 @@ import { FunctionModel } from '../Models/index.js';
 /**
  * Re-derives EVERY published number in README.md from Mongo. Read-only, 0 tokens.
  *
- * Run this before judging (or before editing any figure in the docs) so nothing
+ * Run this before a release (or before editing any figure in the docs) so nothing
  * quoted out loud is stale:
  *
  *   npx tsx src/Scripts/readme-facts.ts

@@ -16,7 +16,7 @@ import { ExtractorCacheFileSchema, type ExtractedFunction } from '../src/Models/
  */
 
 const loadFixture = async (): Promise<ExtractedFunction[]> => {
-  const raw = await readFile(new URL('../.cache/ditto-demo.json', import.meta.url), 'utf8');
+  const raw = await readFile(new URL('./fixtures/ditto-demo.json', import.meta.url), 'utf8');
   const parsed = ExtractorCacheFileSchema.parse(JSON.parse(raw));
   return Array.isArray(parsed) ? parsed : parsed.functions;
 };

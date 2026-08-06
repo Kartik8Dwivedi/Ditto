@@ -19,8 +19,8 @@ import type { Express } from 'express';
  *   ~350 for ONE user running ONE analysis
  *
  * The old limit of 500 left almost no room: a second browser tab, or a run that
- * spans two windows, would 429 a legitimate user mid-analysis. It gets worse at
- * a venue, where every judge on the same WiFi shares one NAT egress IP — five
+ * spans two windows, would 429 a legitimate user mid-analysis. It gets worse
+ * behind shared NAT, where every user on the same network shares one egress IP — five
  * concurrent users would blow a 500 budget outright while doing nothing wrong.
  *
  * 2000/10min (~3.3 req/s sustained) fits roughly five concurrent analyses from

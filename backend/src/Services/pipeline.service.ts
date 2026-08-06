@@ -213,12 +213,20 @@ class PipelineService {
 
     const saved = await this.functionRepository.replaceForRepo(
       repoId,
-      functions.map((fn) => ({
-        ...fn,
-        repoId: repo._id,
-        fingerprint: fingerprints.byHash.get(fn.bodyHash),
-        embedding: embeddings.byHash.get(fn.bodyHash),
-      }))
+      functions.map((fn) => {
+        const embedding = embeddings.byHash.get(fn.bodyHash);
+        return {
+          ...fn,
+          repoId: repo._id,
+          fingerprint: fingerprints.byHash.get(fn.bodyHash),
+          embedding,
+          // Stamp the recipe every stored vector was built under. Reuse above is
+          // gated on embedCacheValid, so an embedding written here is always the
+          // CURRENT recipe. This per-document stamp is what lets the guard path
+          // tell a current vector from a stale cross-repo cache hit.
+          embedVersion: embedding && embedding.length > 0 ? EMBED_VERSION : undefined,
+        };
+      })
     );
     // The stored embeddings now match the current recipe — record it so the next
     // run reuses them for free.

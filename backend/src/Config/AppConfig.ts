@@ -46,10 +46,10 @@ const envSchema = z.object({
    * LIVE CAPS — the only knobs separating a rich demo run from a cheap one.
    * Changing mode is an env edit + redeploy, never a code change:
    *
-   *   TEST MODE     LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
-   *     Our hero runs: a full analysis comparable to the offline cline run.
-   *   JUDGING MODE  LIVE_MAX_FUNCTIONS=600   LIVE_CANDIDATE_CAP=20
-   *     Flip to this before judging — protects the API budget when strangers
+   *   FULL MODE        LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
+   *     A full analysis comparable to the offline cline run.
+   *   RESTRICTED MODE  LIVE_MAX_FUNCTIONS=600   LIVE_CANDIDATE_CAP=20
+   *     Flip to this in production — protects the API budget when strangers
    *     are pasting URLs. ~₹25-35 per run instead of several hundred.
    *
    * These bound the LIVE path only. The offline CLI pipeline is unaffected and
@@ -57,6 +57,19 @@ const envSchema = z.object({
    */
   LIVE_MAX_FUNCTIONS: z.coerce.number().int().positive().default(2000),
   LIVE_CANDIDATE_CAP: z.coerce.number().int().positive().default(100),
+  /**
+   * PER-IP / PER-DAY spend budgets — the real, multi-instance-safe kill switch
+   * that replaced the old lifetime LIVE_ANALYSIS_CAP. Backed by an atomic Mongo
+   * counter keyed by {ip, date, bucket}, so the ceiling holds across every
+   * stateless Cloud Run instance. Two separate budgets:
+   *   INDEX — a full repo index (POST /analyze, or POST /pr on an unindexed
+   *           repo). Expensive → tight.
+   *   PR    — a PR check on an already-indexed repo. Cheap → loose.
+   * Both are env-tunable; the defaults are deliberately conservative for a
+   * publicly-pasteable API.
+   */
+  LIVE_INDEX_QUOTA_PER_DAY: z.coerce.number().int().nonnegative().default(3),
+  LIVE_PR_QUOTA_PER_DAY: z.coerce.number().int().nonnegative().default(30),
   /**
    * Wall-clock budget for one live run, checked at every stage boundary.
    *
@@ -101,6 +114,8 @@ const AppConfig = Object.freeze({
   LIVE_MAX_FUNCTIONS: env.LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP: env.LIVE_CANDIDATE_CAP,
   LIVE_DEADLINE_MS: env.LIVE_DEADLINE_MS,
+  LIVE_INDEX_QUOTA_PER_DAY: env.LIVE_INDEX_QUOTA_PER_DAY,
+  LIVE_PR_QUOTA_PER_DAY: env.LIVE_PR_QUOTA_PER_DAY,
   // Cloud Tasks is usable only when every piece it needs is present. Off in
   // local dev (→ /analyze runs the job inline); on in a configured deployment.
   TASKS_ENABLED: Boolean(

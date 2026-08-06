@@ -1,7 +1,7 @@
 /**
  * Keeps the fixture stats honest.
  *
- * The three numbers a judge can actually verify by counting the cluster list —
+ * The three numbers a user can actually verify by counting the cluster list —
  * how many clusters, how many proven conflicts, how many lines are removable —
  * are computed from the clusters rather than typed in. Edit a cluster and the
  * headline follows. It cannot drift into a claim the data does not support.

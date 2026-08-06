@@ -14,6 +14,8 @@ import { DITTO_CLUSTERS, DITTO_REPO, DITTO_STATS } from './clusters.ditto';
 import { CLINE_REPO, CLINE_STATS } from './repos';
 import { sortByRisk, toSummary } from './derive';
 
+export { MOCK_PR_ANALYSIS, getMockPrAnalysis } from './pr';
+
 type MockRepo = RepoDetail & { details: ClusterDetail[] };
 
 const REPOS: MockRepo[] = [

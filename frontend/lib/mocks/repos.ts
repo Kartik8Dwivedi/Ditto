@@ -3,7 +3,7 @@
  *
  * Anything that CAN be derived from the cluster fixtures IS derived (see
  * `derive.ts`), so the map can never claim a total the cluster list does not
- * actually contain. A judge who counts the rows will find they add up.
+ * actually contain. A user who counts the rows will find they add up.
  */
 import type { RepoStats, RepoSummary } from '@/types/ditto';
 import { CLINE_CLUSTERS } from './clusters.cline';

@@ -14,6 +14,15 @@ export interface IFunction extends ExtractedFunction {
   repoId: Types.ObjectId;
   fingerprint?: Fingerprint;
   embedding?: number[];
+  /**
+   * The embed-text recipe (EMBED_VERSION) this document's `embedding` was built
+   * under. `bodyHash` is unchanged when the recipe changes, so this stamp is the
+   * ONLY thing that distinguishes a current vector from a stale one — without it
+   * the cross-repo, content-addressed embedding cache would silently hand back a
+   * vector from an older recipe and let it be cosine-compared against current
+   * ones. Present iff `embedding` is present.
+   */
+  embedVersion?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +59,7 @@ const functionSchema = new mongoose.Schema<IFunction>(
     isPure: { type: Boolean, default: false },
     fingerprint: { type: fingerprintSchema, default: undefined },
     embedding: { type: [Number], default: undefined },
+    embedVersion: { type: String, default: undefined },
   },
   {
     timestamps: true,

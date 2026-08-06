@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import type { Types } from 'mongoose';
 
-import type { JobStatus, JobStage } from './contracts.js';
+import type { JobStatus, JobStage, JobPrBlock } from './contracts.js';
 
 /**
- * One on-demand analysis request — a judge pasted a URL, we queued a run.
+ * One on-demand analysis request — a user pasted a URL, we queued a run.
  *
  * The job is the live-progress record the frontend polls: `stage` advances
  * through the pipeline so the stepper lights up, and `repoId` is filled in when
@@ -27,9 +27,30 @@ export interface IJob {
   functionsTotal: number | null;
   /** Functions actually analysed — may be capped below the total. */
   functionsAnalyzed: number | null;
+  /**
+   * Set only on a per-PR job. The one job model drives both "analyse a repo" and
+   * "check a PR", so a PR job carries its PR metadata here rather than forking a
+   * second job type. See §3.2 of the PR contract.
+   */
+  pr?: JobPrBlock;
+  /** The finished PrAnalysis — set when a PR job completes. */
+  prAnalysisId: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** The PR metadata block on a per-PR job. Sub-document, no own _id. */
+const jobPrSchema = new mongoose.Schema<JobPrBlock>(
+  {
+    prNumber: { type: Number, required: true },
+    headSha: { type: String, required: true },
+    baseSha: { type: String, required: true },
+    headRef: { type: String, required: true },
+    changedFunctions: { type: Number, default: 0 },
+    indexedOnDemand: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
 
 const jobSchema = new mongoose.Schema<IJob>(
   {
@@ -51,6 +72,8 @@ const jobSchema = new mongoose.Schema<IJob>(
     error: { type: String, default: null },
     functionsTotal: { type: Number, default: null },
     functionsAnalyzed: { type: Number, default: null },
+    pr: { type: jobPrSchema, default: undefined },
+    prAnalysisId: { type: mongoose.Schema.Types.ObjectId, ref: 'PrAnalysis', default: null },
   },
   {
     timestamps: true,

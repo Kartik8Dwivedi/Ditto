@@ -8,6 +8,13 @@ export interface CachedDerivation {
   bodyHash: string;
   fingerprint: Fingerprint;
   embedding: number[];
+  /**
+   * The embed-text recipe the cached `embedding` was built under. The fingerprint
+   * is recipe-independent and always reusable; the embedding is only reusable
+   * when this matches the current EMBED_VERSION. May be absent on legacy rows
+   * written before this field existed — such rows must be treated as stale.
+   */
+  embedVersion?: string;
 }
 
 /** Repository for extracted functions and their derived fingerprints/embeddings. */
@@ -71,7 +78,7 @@ class FunctionRepository extends CrudRepository<IFunction> {
         fingerprint: { $exists: true, $ne: null },
         embedding: { $exists: true, $ne: [] },
       })
-      .select('bodyHash fingerprint embedding')
+      .select('bodyHash fingerprint embedding embedVersion')
       .lean<CachedDerivation[]>()
       .exec();
     return rows;

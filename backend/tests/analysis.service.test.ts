@@ -3,18 +3,18 @@ import { describe, it, expect, vi } from 'vitest';
 import AnalysisService, {
   LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP,
-  LIVE_ANALYSIS_CAP,
   describeLiveCaps,
 } from '../src/Services/analysis.service.js';
 
 /**
  * The on-demand orchestrator. What matters and is asserted here:
- *   - dedup returns the existing repo and spends NOTHING (no job, no enqueue),
- *   - the global cap protects the key,
- *   - runJob drives the CAPPED pipeline (250 fns / 20 candidates) and records
- *     honest analysed/total counts,
- *   - an oversized repo is refused before any paid stage runs.
- * The pipeline and indexer are mocked — no LLM is ever reached.
+ *   - dedup returns the existing repo and spends NOTHING (no job, no enqueue,
+ *     and no quota charged),
+ *   - the per-IP/day INDEX quota protects the key and blocks over budget,
+ *   - runJob drives the CAPPED pipeline and records honest analysed/total counts,
+ *   - an oversized repo is refused before any paid stage runs,
+ *   - a per-PR job (job.pr set) is delegated to PrService.runPrJob.
+ * The pipeline, indexer, quota and PrService are mocked — no LLM is ever reached.
  */
 
 const REPO_ID = '6a5a506029d58c7241f1fd90';
@@ -24,13 +24,13 @@ const functionsOfLength = (n: number) => Array.from({ length: n }, (_v, i) => ({
 const makeService = (opts: {
   existingRepo?: unknown;
   tasksEnabled?: boolean;
-  jobCount?: number;
   findById?: unknown;
   extract?: unknown;
   run?: unknown;
+  /** When set, quotaService.consume rejects with this error (budget spent). */
+  quotaError?: Error;
 } = {}) => {
   const findLatest = vi.fn().mockResolvedValue(opts.existingRepo ?? null);
-  const count = vi.fn().mockResolvedValue(opts.jobCount ?? 0);
   const create = vi.fn().mockResolvedValue({ _id: { toString: () => 'job-1' } });
   const findById = vi.fn().mockResolvedValue(opts.findById ?? null);
   const markRunning = vi.fn().mockResolvedValue(undefined);
@@ -41,10 +41,13 @@ const makeService = (opts: {
   const run = vi.fn().mockResolvedValue(opts.run ?? { repoId: REPO_ID });
   const isEnabled = vi.fn().mockReturnValue(opts.tasksEnabled ?? true);
   const enqueueRun = vi.fn().mockResolvedValue(undefined);
+  const consume = opts.quotaError
+    ? vi.fn().mockRejectedValue(opts.quotaError)
+    : vi.fn().mockResolvedValue(undefined);
+  const runPrJob = vi.fn().mockResolvedValue(undefined);
 
   const mocks = {
     findLatest,
-    count,
     create,
     findById,
     markRunning,
@@ -55,11 +58,12 @@ const makeService = (opts: {
     run,
     isEnabled,
     enqueueRun,
+    consume,
+    runPrJob,
   };
 
   const service = new AnalysisService({
     jobRepository: {
-      count,
       create,
       findById,
       markRunning,
@@ -72,28 +76,34 @@ const makeService = (opts: {
     indexerService: { extract } as never,
     pipelineService: { run } as never,
     tasksService: { isEnabled, enqueueRun } as never,
+    quotaService: { consume } as never,
+    prService: { runPrJob } as never,
   });
 
   return { service, mocks };
 };
 
 describe('AnalysisService.analyze', () => {
-  it('returns the existing repo on a dedup hit and creates NO job', async () => {
+  it('returns the existing repo on a dedup hit, creates NO job, and charges NO quota', async () => {
     const { service, mocks } = makeService({ existingRepo: { _id: { toString: () => REPO_ID } } });
 
-    const result = await service.analyze('https://github.com/cline/cline');
+    const result = await service.analyze('https://github.com/cline/cline', '1.2.3.4');
 
     expect(result).toEqual({ jobId: null, repoId: REPO_ID });
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.enqueueRun).not.toHaveBeenCalled();
+    // A repo we already have is free — the daily budget is not touched.
+    expect(mocks.consume).not.toHaveBeenCalled();
   });
 
-  it('queues a new analysis and enqueues a task when none exists', async () => {
+  it('charges the per-IP/day INDEX budget, then queues and enqueues a new analysis', async () => {
     const { service, mocks } = makeService({ tasksEnabled: true });
 
-    const result = await service.analyze('https://github.com/cline/cline');
+    const result = await service.analyze('https://github.com/cline/cline', '1.2.3.4');
 
     expect(result).toEqual({ jobId: 'job-1', repoId: null });
+    // Quota is charged with the real client IP against the INDEX bucket.
+    expect(mocks.consume).toHaveBeenCalledWith('1.2.3.4', 'index');
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({ owner: 'cline', name: 'cline', status: 'queued' })
     );
@@ -104,26 +114,33 @@ describe('AnalysisService.analyze', () => {
     const { service, mocks } = makeService({ tasksEnabled: false });
     const runSpy = vi.spyOn(service, 'runJob').mockResolvedValue(undefined);
 
-    const result = await service.analyze('https://github.com/cline/cline');
+    const result = await service.analyze('https://github.com/cline/cline', '1.2.3.4');
 
     expect(result.jobId).toBe('job-1');
     expect(mocks.enqueueRun).not.toHaveBeenCalled();
     expect(runSpy).toHaveBeenCalledWith('job-1');
   });
 
-  it('refuses once the global live-analysis cap is reached', async () => {
-    const { service, mocks } = makeService({ jobCount: LIVE_ANALYSIS_CAP });
+  it('refuses when the per-IP/day INDEX budget is spent — before any job is created', async () => {
+    const quotaError = new Error('Daily limit reached: you have used all 3 full repo analyses/indexes');
+    const { service, mocks } = makeService({ quotaError });
 
-    await expect(service.analyze('https://github.com/cline/cline')).rejects.toThrow(/capacity/i);
+    await expect(service.analyze('https://github.com/cline/cline', '9.9.9.9')).rejects.toThrow(
+      /Daily limit reached/
+    );
+    // The quota was consulted, and no paid work was queued once it denied.
+    expect(mocks.consume).toHaveBeenCalledWith('9.9.9.9', 'index');
     expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.enqueueRun).not.toHaveBeenCalled();
   });
 
-  it('rejects an invalid URL before touching the database', async () => {
+  it('rejects an invalid URL before touching the database or the quota', async () => {
     const { service, mocks } = makeService({});
 
     await expect(service.analyze('not a url')).rejects.toThrow();
     expect(mocks.findLatest).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.consume).not.toHaveBeenCalled();
   });
 });
 
@@ -221,5 +238,18 @@ describe('AnalysisService.runJob', () => {
       expect.stringMatching(/failed unexpectedly/i),
       10
     );
+  });
+
+  it('delegates a per-PR job (job.pr set) to PrService.runPrJob and runs no index', async () => {
+    const prJob = { ...job, pr: { prNumber: 7, headSha: 'h', baseSha: 'b', headRef: 'f' } };
+    const { service, mocks } = makeService({ findById: prJob });
+
+    await service.runJob('job-1');
+
+    expect(mocks.runPrJob).toHaveBeenCalledWith('job-1');
+    // The ordinary index worker must not run for a PR job.
+    expect(mocks.extract).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
+    expect(mocks.markDone).not.toHaveBeenCalled();
   });
 });

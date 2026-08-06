@@ -39,6 +39,12 @@ export function AnalysisProgress({ jobId, repoSlug }: { jobId: string; repoSlug?
         failuresRef.current = 0;
         setJob(next);
 
+        if (next.status === 'done' && next.prAnalysisId) {
+          // A PR job lands on the PR results page (docs/RESUME_BUILD.md §3.2).
+          // replace() so the back button skips the progress screen.
+          router.replace(`/pr/${next.prAnalysisId}`);
+          return;
+        }
         if (next.status === 'done' && next.repoId) {
           // replace() so the back button skips the progress screen.
           router.replace(`/repo/${next.repoId}`);

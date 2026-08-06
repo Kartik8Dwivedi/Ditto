@@ -28,6 +28,12 @@ export interface ParsedRepo {
   name: string;
   /** Branch/tag/commit taken from a /tree/<ref> or /commit/<ref> URL, else null. */
   ref: string | null;
+  /**
+   * Pull-request number, taken from a `/pull/<n>` (or `/pulls/<n>`) URL. Present
+   * only when the pasted URL points at a PR. The /analyze path ignores it; the
+   * /pr path uses it to pick the PR to check.
+   */
+  prNumber?: number;
 }
 
 /** GitHub paths whose first segment is a site feature, not a repo owner. */
@@ -97,5 +103,14 @@ export const parseGitHubUrl = (raw: string): ParsedRepo => {
     ref = decodeURIComponent(segments[3]);
   }
 
-  return { owner, name, ref };
+  // A pull-request URL: github.com/owner/repo/pull/<n>. `owner` is the real repo
+  // owner here (not the reserved site path `github.com/pulls`), so it parses as a
+  // normal repo — we just also lift the PR number out so the /pr path can use it.
+  let prNumber: number | undefined;
+  if (segments.length >= 4 && (segments[2] === 'pull' || segments[2] === 'pulls')) {
+    const parsed = Number(segments[3]);
+    if (Number.isInteger(parsed) && parsed > 0) prNumber = parsed;
+  }
+
+  return { owner, name, ref, ...(prNumber !== undefined ? { prNumber } : {}) };
 };

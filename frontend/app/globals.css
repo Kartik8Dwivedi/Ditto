@@ -188,7 +188,7 @@ body {
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-sans);
-  /* Dense over airy — a judge should feel this tool knows a lot. */
+  /* Dense over airy — a user should feel this tool knows a lot. */
   font-size: 14px;
   line-height: 1.5;
 }

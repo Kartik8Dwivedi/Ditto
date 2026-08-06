@@ -11,7 +11,7 @@ class JobRepository extends CrudRepository<IJob> {
 
   /**
    * How many analysis jobs exist in total. This is the global live-analysis
-   * counter that protects the OpenAI key during the event: every job is one
+   * counter that protects the OpenAI key: every job is one
    * paid run (dedup hits never create a job), so the row count IS the spend
    * count, and no separate counter can drift out of sync with it.
    */
@@ -47,6 +47,23 @@ class JobRepository extends CrudRepository<IJob> {
             functionsTotal: result.functionsTotal,
           },
         }
+      )
+      .exec();
+  }
+
+  /** Record the changed-function count on a per-PR job's pr block once known. */
+  async setPrChangedFunctions(id: string, changedFunctions: number): Promise<void> {
+    await this.model
+      .updateOne({ _id: id }, { $set: { 'pr.changedFunctions': changedFunctions } })
+      .exec();
+  }
+
+  /** Mark a per-PR job done — the finished analysis to navigate to. */
+  async markPrDone(id: string, prAnalysisId: Types.ObjectId): Promise<void> {
+    await this.model
+      .updateOne(
+        { _id: id },
+        { $set: { status: 'done', stage: 'done', error: null, prAnalysisId } }
       )
       .exec();
   }

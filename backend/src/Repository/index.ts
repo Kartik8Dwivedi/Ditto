@@ -1,6 +1,5 @@
 export { default as CrudRepository } from './crud.repository.js';
 export type { PaginatedResult, PaginationMeta, PaginationOptions } from './crud.repository.js';
-export { default as ResourceRepository } from './resource.repository.js';
 
 export { default as RepoRepository } from './repo.repository.js';
 export { default as FunctionRepository } from './function.repository.js';
@@ -8,3 +7,5 @@ export type { CachedDerivation } from './function.repository.js';
 export { default as ClusterRepository } from './cluster.repository.js';
 export { default as JobRepository } from './job.repository.js';
 export type { JobDocument } from './job.repository.js';
+export { default as PrAnalysisRepository } from './prAnalysis.repository.js';
+export { default as ApiQuotaRepository } from './apiQuota.repository.js';

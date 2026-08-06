@@ -1,6 +1,3 @@
-export { default as CrudService } from './crud.service.js';
-export { default as ResourceService } from './resource.service.js';
-
 export { default as OpenAIService, UsageMeter } from './openai.service.js';
 export type { ModelUsage, StructuredRequest } from './openai.service.js';
 
@@ -39,6 +36,9 @@ export type { ProbeCell, ProbeMember } from './probe.service.js';
 export { default as GuardService, GUARD_SEARCH_FLOOR } from './guard.service.js';
 export type { GuardCheckInput } from './guard.service.js';
 
+export { default as PrService, PR_SEARCH_FLOOR, toPrAnalysis } from './pr.service.js';
+export type { PrAnalyzeInput, PrSubmitResult } from './pr.service.js';
+
 export { default as IntelligenceService } from './intelligence.service.js';
 
 export { default as PipelineService } from './pipeline.service.js';
@@ -49,11 +49,15 @@ export type { CacheFile, ExtractResult, IndexOptions, IndexReport } from './inde
 
 export { default as TasksService } from './tasks.service.js';
 
+export { default as QuotaService, dayKey } from './quota.service.js';
+
 export {
-  default as AnalysisService,
+  runLiveIndex,
   LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP,
-  LIVE_ANALYSIS_CAP,
   describeLiveCaps,
-} from './analysis.service.js';
+} from './live-index.js';
+export type { LiveIndexOptions, LiveIndexResult } from './live-index.js';
+
+export { default as AnalysisService } from './analysis.service.js';
 export type { AnalyzeResult } from './analysis.service.js';

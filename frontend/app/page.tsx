@@ -326,7 +326,7 @@ export default function Home() {
             </h2>
           </div>
 
-          {/* Next up, clearly marked as not shipped. */}
+          {/* The live per-PR entry point. */}
           <GuardRoadmapCard />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -341,12 +341,12 @@ export default function Home() {
             </div>
 
             <div className="rounded-xl border border-line bg-panel p-5 space-y-2.5 relative">
-              <span className="absolute top-4 right-4 rounded bg-accent-bg/40 border border-accent-line px-1.5 py-0.5 font-mono text-[9px] text-accent uppercase">
-                Launching Soon
+              <span className="absolute top-4 right-4 rounded bg-success-bg/25 border border-success-line px-1.5 py-0.5 font-mono text-[9px] text-success uppercase">
+                Live Now
               </span>
-              <h3 className="font-mono text-[13px] font-bold text-ink">Stage 2: Ditto Guard (CI)</h3>
+              <h3 className="font-mono text-[13px] font-bold text-ink">Stage 2: Ditto Guard (PR)</h3>
               <p className="text-[12px] leading-relaxed text-ink-muted">
-                Lightweight CI check that only analyzes the PR diff (~$0.01 per check). Blocks PR merges if a developer introduces a semantic duplication.
+                Lightweight per-PR check that only analyzes the diff (~$0.01 per check), flags functions that reinvent existing logic, and executes the pure ones to prove where they disagree.
               </p>
             </div>
 
@@ -367,7 +367,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-4 w-auto shrink-0 opacity-70" />
             <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-4 w-auto shrink-0 opacity-70" />
-            <span>© 2026 Ditto Labs. Built for Hackathon.</span>
+            <span>© 2026 Ditto Labs</span>
           </div>
           <div className="flex items-center gap-4 font-mono">
             <a href="https://github.com/cline/cline" target="_blank" rel="noreferrer" className="hover:text-ink">Cline Repo</a>

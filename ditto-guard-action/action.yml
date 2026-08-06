@@ -1,0 +1,40 @@
+name: 'Ditto Guard'
+description: 'Flag pull requests that reinvent logic already in your codebase — proven by execution, not model opinion.'
+author: 'Kartik Dwivedi'
+branding:
+  icon: 'copy'
+  color: 'purple'
+
+inputs:
+  api-url:
+    description: 'Base URL of the Ditto API instance to use.'
+    required: false
+    default: 'https://ditto-backend-1016629498190.asia-south2.run.app'
+  github-token:
+    description: 'Token used to post the PR comment. Needs `pull-requests: write`.'
+    required: false
+    default: ${{ github.token }}
+  fail-on:
+    description: 'When to fail the check: `none` (advisory, default) | `duplicate` | `proven-divergence`.'
+    required: false
+    default: 'none'
+  timeout-seconds:
+    description: 'Max seconds to wait for analysis. First run on an un-indexed repo indexes it once and can be slow.'
+    required: false
+    default: '300'
+  comment:
+    description: 'Post a PR comment when reinvented functions are found (`true`/`false`).'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      env:
+        INPUT_API_URL: ${{ inputs.api-url }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+      run: bash "${{ github.action_path }}/scripts/guard.sh"

@@ -15,7 +15,9 @@ const analysisService = new AnalysisService();
 /** Paste-a-URL entry point: validate, dedup, queue. Returns fast, never blocks. */
 export const analyze = async (req: Request, res: Response): Promise<void> => {
   const { repoUrl } = req.body as AnalyzeBody;
-  const result = await analysisService.analyze(repoUrl);
+  // req.ip is the REAL client IP behind Cloud Run (app.ts sets trust proxy=1);
+  // it keys the per-IP/day INDEX budget.
+  const result = await analysisService.analyze(repoUrl, req.ip);
   sendSuccess(res, {
     data: result,
     message: result.repoId ? 'Repo already analysed' : 'Analysis queued',

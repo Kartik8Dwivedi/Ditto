@@ -8,7 +8,7 @@
  *
  *   PROVEN     clusters where `hasProvenDivergence === true`
  *              Ditto ran these on the same inputs and watched them disagree.
- *              This is the number a judge can verify by counting the
+ *              This is the number a user can verify by counting the
  *              "they disagree" rows on the map.
  *
  * For cline these are 50 and 11. Labelling 50 as "proven" would overclaim on

@@ -5,7 +5,7 @@ import createApp from '../src/app.js';
 /**
  * Behind Cloud Run, `trust proxy` decides whether `req.ip` is the real client
  * or the proxy. Getting it wrong is silent and expensive: express-rate-limit
- * keys every user into ONE bucket, so a single polling analysis can 429 a judge.
+ * keys every user into ONE bucket, so a single polling analysis can 429 a legitimate user.
  * These pin the exact value, because both wrong answers are plausible edits.
  */
 describe('app trust proxy', () => {
