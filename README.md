@@ -301,9 +301,9 @@ We also note [arXiv 2509.25754](https://arxiv.org/abs/2509.25754) — classical 
 
 ## Contribute
 
-This started as a hackathon project. It's not going to stay one.
+Ditto is open source, and it's built to grow.
 
-The problem is real and getting worse: AI agents write more code every month, they can't read your whole codebase before they write, and the check that would catch the resulting duplicates is precisely the check that's too expensive to run. We think that's worth solving properly, and we don't want to leave it at a demo.
+The problem is real and getting worse: AI agents write more code every month, they can't read your whole codebase before they write, and the check that would catch the resulting duplicates is precisely the check that's too expensive to run. We think that's worth solving properly, and we don't want to leave it as a prototype.
 
 **If any of this resonates, we'd genuinely love your help.**
 
@@ -326,12 +326,12 @@ Issues and pull requests are welcome and will be read by humans who are glad you
 
 ## How we built this
 
-Built with **OpenAI Codex** and **Claude** in tandem across the hackathon window. Codex authored the repo conventions (`AGENTS.md`) and the frontend scaffold; the pipeline, product, and UI came together over dedicated agent sessions. The commit history reflects that mixed authorship honestly.
+Built with **OpenAI Codex** and **Claude** working in tandem. Codex authored the repo conventions (`AGENTS.md`) and the frontend scaffold; the pipeline, product, and UI came together over dedicated agent sessions. The commit history reflects that mixed authorship honestly.
 
 Every number and code output in this README was executed or read from the live database. Nothing here is illustrative.
 
 ---
 
 <p align="center">
-  <em>OpenAI × NamasteDev Codex Hackathon, July 2026.</em>
+  <em>Built with OpenAI Codex and Claude, 2026.</em>
 </p>

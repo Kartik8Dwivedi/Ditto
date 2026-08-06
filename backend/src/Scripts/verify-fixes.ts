@@ -115,7 +115,7 @@ const main = async (): Promise<void> => {
         const fn = byId.get(id)!;
         const mark = truncateIds.has(id) ? '► truncateText' : '  OTHER';
         console.log(`        ${mark}  ${fn.file}:${fn.startLine}  ${fn.name}`);
-        // For non-truncateText members, show the signature so we can judge
+        // For non-truncateText members, show the signature so we can assess
         // whether it is a real truncate-style function or a false positive.
         if (!truncateIds.has(id)) {
           console.log(`              sig: ${fn.signature.replace(/\s+/g, ' ').slice(0, 140)}`);

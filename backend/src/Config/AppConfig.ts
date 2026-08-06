@@ -46,10 +46,10 @@ const envSchema = z.object({
    * LIVE CAPS — the only knobs separating a rich demo run from a cheap one.
    * Changing mode is an env edit + redeploy, never a code change:
    *
-   *   TEST MODE     LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
-   *     Our hero runs: a full analysis comparable to the offline cline run.
-   *   JUDGING MODE  LIVE_MAX_FUNCTIONS=600   LIVE_CANDIDATE_CAP=20
-   *     Flip to this before judging — protects the API budget when strangers
+   *   FULL MODE        LIVE_MAX_FUNCTIONS=2000  LIVE_CANDIDATE_CAP=100
+   *     A full analysis comparable to the offline cline run.
+   *   RESTRICTED MODE  LIVE_MAX_FUNCTIONS=600   LIVE_CANDIDATE_CAP=20
+   *     Flip to this in production — protects the API budget when strangers
    *     are pasting URLs. ~₹25-35 per run instead of several hundred.
    *
    * These bound the LIVE path only. The offline CLI pipeline is unaffected and

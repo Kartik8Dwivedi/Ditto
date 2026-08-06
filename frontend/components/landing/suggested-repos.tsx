@@ -5,7 +5,7 @@ import { SUGGESTED_REPO_GROUPS } from '@/lib/config';
 import { PASTE_BOX_INPUT_ID, usePasteBox } from '@/stores/paste-box.store';
 
 /**
- * Verified repos a judge can try, in two labelled groups.
+ * Verified repos a user can try, in two labelled groups.
  *
  * The grouping is the point: a clean library returning zero clusters is a
  * CORRECT result, and saying so up front stops an empty map being read as the

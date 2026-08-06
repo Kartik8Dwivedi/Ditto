@@ -9,7 +9,7 @@
  * these exact function bodies in node. If you edit a body, re-run the probe and
  * update the rows. Never hand-write an output.
  *
- * The stats that a judge can verify by counting the cluster list are derived
+ * The stats that a user can verify by counting the cluster list are derived
  * from it (see `derive.ts`), not typed in, so they cannot drift.
  */
 import type { ClusterDetail, RepoStats, RepoSummary } from '@/types/ditto';

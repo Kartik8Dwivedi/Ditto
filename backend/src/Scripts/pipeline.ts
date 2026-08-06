@@ -7,7 +7,7 @@ import logger from '../Config/logger.js';
  *
  * Reads the extractor's cache, runs the full pipeline, and writes the results to
  * Mongo. Runs LOCALLY and is never deployed — which is exactly why the deployed
- * API cannot be asked to clone a repo on a judge's behalf, and why the demo
+ * API cannot be asked to clone a repo on a user's behalf, and why the hosted app
  * reads from a database instead of a model.
  *
  * A thin CLI adapter: argv in, PipelineService out, no logic of its own.

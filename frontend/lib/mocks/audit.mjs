@@ -1,7 +1,7 @@
 /**
  * Fixture audit — see audit.md.
  *
- * The fixtures make claims a judge can check. This checks them first.
+ * The fixtures make claims a reader can check. This checks them first.
  *
  *   cd frontend && node lib/mocks/audit.mjs
  *

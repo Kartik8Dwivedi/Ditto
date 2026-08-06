@@ -3,7 +3,7 @@ import type { DisagreementRisk, RepoStats } from '../Models/index.js';
 /**
  * Repo scoring — pure functions, no LLM, no database.
  *
- * Everything here ends up on screen in front of judges, so every number must be
+ * Everything here ends up on screen in front of users, so every number must be
  * explainable in one sentence and stable across runs. That is why this file has
  * no dependencies and no I/O: it is arithmetic over facts the pipeline already
  * established.

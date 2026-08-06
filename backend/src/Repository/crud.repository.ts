@@ -32,7 +32,7 @@ export interface PaginatedResult<T> {
  * depend on repositories, never on Mongoose directly — this keeps the data
  * source swappable and the business logic testable.
  *
- * @typeParam TDoc - The raw document interface for the model (e.g. `IResource`).
+ * @typeParam TDoc - The raw document interface for the model (e.g. `IRepo`).
  */
 abstract class CrudRepository<TDoc> {
   protected readonly model: Model<TDoc>;

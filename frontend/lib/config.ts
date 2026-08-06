@@ -36,13 +36,14 @@ export function isRestrictedMode(): boolean {
 export function liveMaxFunctions(): number {
   const raw = process.env.LIVE_MAX_FUNCTIONS ?? process.env.NEXT_PUBLIC_LIVE_MAX_FUNCTIONS;
   const parsed = Number(raw);
-  // Fallback matches the documented JUDGING-mode cap (docs/ONDEMAND.md), so a
+  // Fallback matches the documented restricted-mode cap (docs/ONDEMAND.md), so a
   // missing env var can never make the UI quote a limit the backend doesn't use.
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 600;
 }
 
 /** Source, so anyone can run the pipeline unrestricted. */
-export const GITHUB_REPO_URL = 'https://github.com/Kartik8Dwivedi/openai-codex-hackathon';
+// TODO: confirm final public repo URL
+export const GITHUB_REPO_URL = 'https://github.com/kartik8dwivedi/ditto';
 
 export type SuggestedRepo = {
   /** Full GitHub URL — pasted verbatim into the analyse box. */
@@ -55,7 +56,7 @@ export type SuggestedRepo = {
 
 export type SuggestedRepoGroup = {
   label: string;
-  /** One line telling a judge what this group demonstrates. */
+  /** One line telling a user what this group demonstrates. */
   hint: string;
   repos: SuggestedRepo[];
 };
@@ -65,10 +66,10 @@ export type SuggestedRepoGroup = {
  *
  * Every count here was measured with `npm run index` — not estimated. Only add
  * a repo after measuring it: an unverified suggestion that turns out to be over
- * the cap walks a judge straight into the failure the banner exists to prevent.
+ * the cap walks a user straight into the failure the banner exists to prevent.
  *
  * The two groups are deliberate. A clean library returning zero clusters is a
- * CORRECT result, not a failure, and grouping says so before a judge can read
+ * CORRECT result, not a failure, and grouping says so before a user can read
  * an empty map as the tool being broken.
  */
 export const SUGGESTED_REPO_GROUPS: SuggestedRepoGroup[] = [

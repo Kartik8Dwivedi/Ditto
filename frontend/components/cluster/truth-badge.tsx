@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
- * ⚠️ LOAD-BEARING HONESTY FEATURE — not decoration. See PRD §4.3.
+ * ⚠️ LOAD-BEARING HONESTY FEATURE — not decoration.
  *
- * Judges are told to try to break this. The rule it enforces is absolute:
+ * Users are invited to try to break this. The rule it enforces is absolute:
  * output we predicted must NEVER be presented as output we ran. There is no
  * state of this component where `executed === false` reads as green.
  */
