@@ -23,7 +23,7 @@ const createApp = (): Express => {
    * TLS and sets `X-Forwarded-For`. Without this, `trust proxy` is false, so
    * `req.ip` is the proxy's address for EVERY client: express-rate-limit throws
    * ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and, worse, all users share a single
-   * rate-limit bucket — one polling analysis could 429 a judge.
+   * rate-limit bucket — one polling analysis could 429 a legitimate user.
    *
    * The value is 1, not `true`: `true` trusts the whole X-Forwarded-For chain,
    * and the left-hand entries are client-supplied, so anyone could spoof the

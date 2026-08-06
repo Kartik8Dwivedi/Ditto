@@ -25,13 +25,13 @@ import type { HydratedDocument } from 'mongoose';
  */
 
 /**
- * The live caps, read from the environment so TEST mode (2000/100) and JUDGING
- * mode (600/20) are an env edit + redeploy apart — never a code change. See
+ * The live caps, read from the environment so the full caps (2000/100) and the
+ * restricted caps (600/20) are an env edit + redeploy apart — never a code change. See
  * AppConfig and docs/ONDEMAND.md. The offline CLI pipeline ignores these.
  */
 export const LIVE_MAX_FUNCTIONS = AppConfig.LIVE_MAX_FUNCTIONS;
 export const LIVE_CANDIDATE_CAP = AppConfig.LIVE_CANDIDATE_CAP;
-/** Total live analyses allowed for the whole event — protects the key. */
+/** Total live analyses allowed for the hosted instance — protects the key. */
 export const LIVE_ANALYSIS_CAP = 20;
 
 /** One line naming the mode that is actually live, for the Cloud Run logs. */
@@ -62,6 +62,9 @@ const toJob = (doc: HydratedDocument<IJob>): Job => ({
   error: doc.error,
   functionsTotal: doc.functionsTotal,
   functionsAnalyzed: doc.functionsAnalyzed,
+  // Present only on a per-PR job — lets the ONE poll endpoint drive both flows.
+  ...(doc.pr ? { pr: doc.pr } : {}),
+  prAnalysisId: doc.prAnalysisId ? doc.prAnalysisId.toString() : null,
 });
 
 class AnalysisService {
@@ -101,11 +104,11 @@ class AnalysisService {
     }
 
     // Global guard: every job is one paid run, so the job count IS the spend
-    // count. Refuse politely once the event budget is reached.
+    // count. Refuse politely once the analysis budget is reached.
     const used = await this.jobRepository.count();
     if (used >= LIVE_ANALYSIS_CAP) {
       throw new AppError(
-        'Live analysis is at capacity for the event — explore the pre-analysed repos.',
+        'Live analysis is at capacity right now — explore the pre-analysed repos.',
         StatusCodes.TOO_MANY_REQUESTS
       );
     }

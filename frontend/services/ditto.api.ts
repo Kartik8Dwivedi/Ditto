@@ -25,11 +25,19 @@ import type {
   ApiEnvelope,
   ClusterDetail,
   Job,
+  PrAnalysis,
+  PrAnalyzeResponse,
   RepoDetail,
   RepoSummary,
 } from '@/types/ditto';
-import { getMockCluster, getMockRepo, getMockRepos } from '@/lib/mocks';
-import { parseGitHubRepo } from '@/lib/github';
+import {
+  getMockCluster,
+  getMockPrAnalysis,
+  getMockRepo,
+  getMockRepos,
+  MOCK_PR_ANALYSIS,
+} from '@/lib/mocks';
+import { parseGitHubRepo, parsePullRequest } from '@/lib/github';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -213,4 +221,44 @@ export async function getJob(jobId: string): Promise<Job> {
     throw new DittoApiError('Job polling is not available without the backend.', 'not_found', 404);
   }
   return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
+}
+
+/**
+ * POST /api/v1/pr — kick off (or dedup) a per-PR analysis (RESUME_BUILD.md §3.1).
+ *
+ * Returns `{ jobId, prAnalysisId: null }` for a new queued check (poll the job,
+ * then navigate to `/pr/:prAnalysisId` on done), or `{ jobId: null,
+ * prAnalysisId }` when the same head SHA was already analysed (navigate now).
+ *
+ * Accepts a pasted PR URL; the backend body is `{ url }` per §3.1.
+ */
+export async function analyzePR(prUrl: string): Promise<PrAnalyzeResponse> {
+  const ref = parsePullRequest(prUrl);
+  const canonicalUrl = ref
+    ? `https://github.com/${ref.owner}/${ref.name}/pull/${ref.prNumber}`
+    : prUrl.trim();
+
+  if (SOURCE === 'mock') {
+    await sleep(MOCK_LATENCY_MS / 3);
+    // Offline demo: any valid PR URL resolves to the single canned analysis so
+    // the whole surface is walkable without a backend. Anything that is not a
+    // PR URL cannot be checked, and we say so rather than fake a run.
+    if (ref) return { jobId: null, prAnalysisId: MOCK_PR_ANALYSIS.id };
+    throw new DittoApiError(
+      'Live PR analysis needs the Ditto backend running. Paste a github.com/owner/repo/pull/<number> URL, or point NEXT_PUBLIC_DITTO_SOURCE at the API.',
+      'bad_response',
+    );
+  }
+  return request<PrAnalyzeResponse>('/pr', { url: canonicalUrl });
+}
+
+/** GET /api/v1/pr/:prAnalysisId — fetch a finished PR analysis (§3.1). */
+export async function fetchPrAnalysis(id: string): Promise<PrAnalysis> {
+  if (SOURCE === 'mock') {
+    await sleep(MOCK_LATENCY_MS);
+    const pr = getMockPrAnalysis(id);
+    if (!pr) throw new DittoApiError(`No PR analysis with id "${id}".`, 'not_found', 404);
+    return pr;
+  }
+  return request<PrAnalysis>(`/pr/${encodeURIComponent(id)}`);
 }

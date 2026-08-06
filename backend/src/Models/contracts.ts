@@ -232,6 +232,22 @@ export type JobStage = z.infer<typeof JobStageSchema>;
  */
 export type StageReporter = (stage: JobStage) => void | Promise<void>;
 
+/**
+ * The PR-specific block a per-PR job carries, so the ONE job/poll machinery
+ * drives both "analyse a repo" and "check a PR" without a second job type. Set
+ * only on jobs created by the /pr path; absent on ordinary /analyze jobs.
+ */
+export type JobPrBlock = {
+  prNumber: number;
+  headSha: string;
+  baseSha: string;
+  headRef: string;
+  /** Count kept after the diff-range filter — the PR's changed functions. */
+  changedFunctions: number;
+  /** True if we had to full-index the base repo first (Stage B). */
+  indexedOnDemand: boolean;
+};
+
 /** The GET /jobs/:jobId payload the frontend polls. */
 export type Job = {
   id: string;
@@ -245,6 +261,10 @@ export type Job = {
   functionsTotal: number | null;
   /** How many we actually analysed (may be capped below the total). */
   functionsAnalyzed: number | null;
+  /** Present only on a per-PR job — see {@link JobPrBlock}. */
+  pr?: JobPrBlock;
+  /** Set on a done PR job — the finished PrAnalysis to fetch/navigate to. */
+  prAnalysisId?: string | null;
 };
 
 export type ClusterSummary = {
@@ -269,6 +289,13 @@ export type ClusterDetail = ClusterSummary & {
     loc: number;
     isPure: boolean;
     isCanonical: boolean;
+    /**
+     * Provenance — the ONLY additive change to an existing member shape (§3.3).
+     * 'pr' marks the function this PR introduced/changed; 'baseline' the existing
+     * implementation it matched. Absent on ordinary (non-PR) cluster members, so
+     * every existing renderer keeps working unchanged.
+     */
+    origin?: 'baseline' | 'pr';
   }>;
   differences: string[];
   divergence?: DivergenceTable;
@@ -283,4 +310,59 @@ export type GuardResult = {
     usedBy: string[];
     verdict: 'duplicate' | 'near-duplicate' | 'novel';
   }>;
+};
+
+/* ------------------------------------------------------------------ *
+ * Per-PR analysis (the flagship "check this PR" path — see §3.4)
+ * ------------------------------------------------------------------ */
+
+/** A repo-relative code location, as shown against a PR finding. */
+export type PrFunctionRef = {
+  name: string;
+  file: string;
+  startLine: number;
+  endLine: number;
+};
+
+/**
+ * One changed function, judged against the repo's existing index.
+ *
+ * `proof` is the honesty flag that drives the truth badge and is NEVER inflated:
+ *   - 'executed'  — both the PR fn and its match are pure, the sandbox ran them
+ *                   on the adjudicator's inputs, and `divergence` is that real,
+ *                   executed table.
+ *   - 'suspected' — a match the flagship confirmed, but at least one side is
+ *                   impure (or the sandbox could not materialise a comparison),
+ *                   so `divergence` is null. A model opinion, never proven.
+ *   - 'none'      — novel: no confirmed reinvention, `match`/`divergence` null.
+ */
+export type PrFinding = {
+  newFunction: PrFunctionRef;
+  match: PrFunctionRef | null;
+  verdict: 'duplicate' | 'near-duplicate' | 'novel';
+  /** Cosine similarity of the PR fn to its nearest compatible neighbour. */
+  similarity: number;
+  /** Adjudicator confidence in the match; 0 when novel. */
+  confidence: number;
+  /** Modules that already contain the matched behaviour. */
+  usedBy: string[];
+  /** The EXECUTED divergence table when both sides pure; null otherwise. */
+  divergence: DivergenceTable | null;
+  proof: 'executed' | 'suspected' | 'none';
+};
+
+/** A finished per-PR analysis — self-contained, keyed for dedup by headSha. */
+export type PrAnalysis = {
+  id: string;
+  owner: string;
+  name: string;
+  prNumber: number;
+  headSha: string;
+  baseSha: string;
+  prUrl: string;
+  /** Count kept after the diff-range filter. */
+  changedFunctions: number;
+  /** One per changed function (novel ones included). */
+  findings: PrFinding[];
+  createdAt: string;
 };

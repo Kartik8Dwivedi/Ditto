@@ -73,6 +73,13 @@ export type ClusterMember = {
   loc: number;
   isPure: boolean;
   isCanonical: boolean;
+  /**
+   * Provenance (docs/RESUME_BUILD.md §3.3). `'pr'` marks the function a pull
+   * request introduced or changed; `'baseline'` is the already-indexed impl it
+   * reinvents. Absent on the ordinary repo-map path. Every existing renderer
+   * keeps working; the PR surface uses `origin === 'pr'` to badge the new one.
+   */
+  origin?: 'baseline' | 'pr';
 };
 
 export type DivergenceResult = {
@@ -146,6 +153,26 @@ export type Job = {
   functionsTotal: number | null;
   /** How many were actually analysed (may be capped below the total). */
   functionsAnalyzed: number | null;
+  /**
+   * Present only on a per-PR job (docs/RESUME_BUILD.md §3.2). The existing
+   * job→poll→stepper machinery is reused unchanged; this optional block just
+   * carries the PR context so the progress view can label it.
+   */
+  pr?: {
+    prNumber: number;
+    headSha: string;
+    baseSha: string;
+    headRef: string;
+    /** Count kept after the diff-range filter. */
+    changedFunctions: number;
+    /** True if the base repo had to be full-indexed before the PR ran. */
+    indexedOnDemand: boolean;
+  };
+  /**
+   * Set on done for a PR job — the analysis to navigate to (§3.2), alongside or
+   * instead of `repoId`. The progress view routes to `/pr/:prAnalysisId`.
+   */
+  prAnalysisId?: string;
 };
 
 /**
@@ -168,3 +195,70 @@ export const CONFIDENCE_CLAIM_THRESHOLD = 0.8;
 export function isHardClaim(cluster: Pick<ClusterSummary, 'confidence'>): boolean {
   return cluster.confidence >= CONFIDENCE_CLAIM_THRESHOLD;
 }
+
+/* ------------------------------------------------------------------ *
+ * Per-PR analysis (docs/RESUME_BUILD.md §3.4).
+ *
+ * A PR result is expressed with the existing cluster/member/divergence shapes
+ * plus a provenance flag, so the current rendering components work with
+ * near-zero change. These mirror the backend byte-for-byte — do not change one
+ * side without the other.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Response of `POST /api/v1/pr`. Exactly one of the two is set (§3.1):
+ *   { jobId, prAnalysisId: null } — analysis queued; poll the job.
+ *   { jobId: null, prAnalysisId } — dedup hit (same headSha); results ready.
+ */
+export type PrAnalyzeResponse = {
+  jobId: string | null;
+  prAnalysisId: string | null;
+};
+
+/** Where a function lives — the identity of a PR fn or the impl it reinvents. */
+export type PrFunctionRef = {
+  name: string;
+  file: string;
+  startLine: number;
+  endLine: number;
+};
+
+export type PrFinding = {
+  /** The function this PR introduced or changed. */
+  newFunction: PrFunctionRef;
+  /** The already-indexed implementation it reinvents, or null when novel. */
+  match: PrFunctionRef | null;
+  verdict: 'duplicate' | 'near-duplicate' | 'novel';
+  /** Cosine similarity between the PR fn and its match. */
+  similarity: number;
+  /** Adjudicator confidence. */
+  confidence: number;
+  /** Modules importing the existing impl. */
+  usedBy: string[];
+  /**
+   * An EXECUTED divergence table when both sides are pure; null otherwise.
+   * Never fabricated: if `proof !== 'executed'` this is null.
+   */
+  divergence: Divergence | null;
+  /**
+   * ⚠️ LOAD-BEARING HONESTY FLAG — drives the truth badge.
+   * `'executed'`  — both pure, really run, `divergence` is real.
+   * `'suspected'` — a side is impure; the model suspects but nothing was proven.
+   * `'none'`      — nothing to prove (e.g. a novel function with no match).
+   */
+  proof: 'executed' | 'suspected' | 'none';
+};
+
+export type PrAnalysis = {
+  id: string;
+  owner: string;
+  name: string;
+  prNumber: number;
+  headSha: string;
+  baseSha: string;
+  prUrl: string;
+  changedFunctions: number;
+  /** One per changed function that matched (novel ones optional). */
+  findings: PrFinding[];
+  createdAt: string;
+};
