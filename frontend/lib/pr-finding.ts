@@ -34,21 +34,13 @@ export function findingDiverged(finding: PrFinding): boolean {
  * `DivergenceTable` actually reads are populated — it never touches `body`, and
  * PrFinding carries no function source (§3.4), so bodies stay empty.
  *
- * §3.4 does not tie `divergence.rows[].results[].functionId` to newFunction vs
- * match, so we adopt the convention that the existing match is emitted FIRST
- * (canonical) and the PR's new function SECOND, and map member ids from the
- * order the functionIds first appear. See the FRONTEND report note.
+ * The backend probes the pair with stable, explicit member ids: the existing
+ * implementation is `'baseline'` and the PR's new function is `'pr'` (see the
+ * ProbeService call in backend pr.service). We key the members to those exact
+ * ids so `DivergenceTable` — which matches `result.functionId === member.id` —
+ * lines up the output columns correctly regardless of row/result order.
  */
 export function findingToCluster(finding: PrFinding, index: number): ClusterDetail {
-  const rows = finding.divergence?.rows ?? [];
-
-  const orderedIds: string[] = [];
-  for (const row of rows) {
-    for (const result of row.results) {
-      if (!orderedIds.includes(result.functionId)) orderedIds.push(result.functionId);
-    }
-  }
-
   const proven = findingDiverged(finding);
   const bothPure = finding.proof === 'executed';
 
@@ -56,7 +48,7 @@ export function findingToCluster(finding: PrFinding, index: number): ClusterDeta
 
   if (finding.match) {
     members.push({
-      id: orderedIds[0] ?? `match-${index}`,
+      id: 'baseline',
       name: finding.match.name,
       file: finding.match.file,
       startLine: finding.match.startLine,
@@ -70,7 +62,7 @@ export function findingToCluster(finding: PrFinding, index: number): ClusterDeta
   }
 
   members.push({
-    id: orderedIds[finding.match ? 1 : 0] ?? `pr-${index}`,
+    id: 'pr',
     name: finding.newFunction.name,
     file: finding.newFunction.file,
     startLine: finding.newFunction.startLine,

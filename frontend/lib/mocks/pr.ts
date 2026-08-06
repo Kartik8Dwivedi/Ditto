@@ -78,32 +78,32 @@ export const MOCK_PR_ANALYSIS: PrAnalysis = {
             input: '"Hello world foo", 8',
             diverged: true,
             results: [
-              { functionId: 'cline_truncate_text', output: '"Hello w…"' },
-              { functionId: 'cline_shorten_text', output: '"Hello…"' },
+              { functionId: 'baseline', output: '"Hello w…"' },
+              { functionId: 'pr', output: '"Hello…"' },
             ],
           },
           {
             input: '"Short", 8',
             diverged: true,
             results: [
-              { functionId: 'cline_truncate_text', output: '"Short"' },
-              { functionId: 'cline_shorten_text', output: '"Short…"' },
+              { functionId: 'baseline', output: '"Short"' },
+              { functionId: 'pr', output: '"Short…"' },
             ],
           },
           {
             input: '"a b c d e f", 5',
             diverged: true,
             results: [
-              { functionId: 'cline_truncate_text', output: '"a b …"' },
-              { functionId: 'cline_shorten_text', output: '"a b c…"' },
+              { functionId: 'baseline', output: '"a b …"' },
+              { functionId: 'pr', output: '"a b c…"' },
             ],
           },
           {
             input: '"", 4',
             diverged: true,
             results: [
-              { functionId: 'cline_truncate_text', output: '""' },
-              { functionId: 'cline_shorten_text', output: '"…"' },
+              { functionId: 'baseline', output: '""' },
+              { functionId: 'pr', output: '"…"' },
             ],
           },
         ],
