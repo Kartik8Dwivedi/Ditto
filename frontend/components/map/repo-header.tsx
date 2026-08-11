@@ -3,6 +3,7 @@ import { GitBranch } from 'lucide-react';
 import type { RepoSummary } from '@/types/ditto';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { CopyLinkButton } from '@/components/ui/copy-link-button';
 
 /**
  * Absolute, in UTC, rather than "4h ago" — a relative label computed on the
@@ -12,6 +13,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 function formatIndexedAt(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
+
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -30,8 +32,16 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
           href="/"
           className="flex items-center gap-2 text-ink transition-opacity duration-150 hover:opacity-80"
         >
-          <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-5 w-auto shrink-0" />
-          <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-5 w-auto shrink-0" />
+          <img
+            src="/logo/ditto_dark_bg.png"
+            alt="Ditto Logo"
+            className="logo-dark-theme h-5 w-auto shrink-0"
+          />
+          <img
+            src="/logo/ditto_white_bg.png"
+            alt="Ditto Logo"
+            className="logo-light-theme h-5 w-auto shrink-0"
+          />
         </Link>
 
         <span aria-hidden className="h-3.5 w-px bg-line-strong" />
@@ -42,6 +52,7 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
             <span className="text-ink-subtle">/</span>
             {repo.name}
           </span>
+
           <span className="inline-flex items-center gap-1 rounded bg-inset px-1.5 py-px font-mono text-[10px] text-ink-muted">
             <GitBranch aria-hidden className="size-2.5" />
             {repo.commit}
@@ -50,10 +61,15 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
 
         <div className="ml-auto flex items-center gap-3">
           <MockDataNotice />
+
+          <CopyLinkButton />
+
           <span className="hidden font-mono text-[11px] text-ink-subtle sm:inline">
             indexed {formatIndexedAt(repo.indexedAt)} UTC
           </span>
+
           <span aria-hidden className="hidden h-3.5 w-px bg-line-strong sm:inline" />
+
           <ThemeToggle />
         </div>
       </div>
