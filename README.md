@@ -28,6 +28,7 @@
   <img alt="Functions analysed" src="https://img.shields.io/badge/functions_analysed-5%2C897-blue">
   <img alt="Proven by execution" src="https://img.shields.io/badge/proven_by_execution-18-red">
   <img alt="JS / TS" src="https://img.shields.io/badge/JS%20%2F%20TS-ts--morph-3178c6">
+  <a href="https://github.com/Kartik8Dwivedi/Ditto/labels/good%20first%20issue"><img alt="Good first issues" src="https://img.shields.io/github/issues/Kartik8Dwivedi/ditto/good%20first%20issue?label=good%20first%20issues&color=7057ff"></a>
 </p>
 
 <p align="center">
@@ -320,6 +321,8 @@ We also note [arXiv 2509.25754](https://arxiv.org/abs/2509.25754) — classical 
 ---
 
 ## Contribute
+
+> 👋 **First time here?** Grab a **[good first issue](https://github.com/Kartik8Dwivedi/Ditto/labels/good%20first%20issue)** — each one names the exact files to touch, the acceptance criteria, and how to verify it. Just claim it in a comment (no need to ask first). New to open source? [CONTRIBUTING.md](CONTRIBUTING.md) walks you through setup and the test commands.
 
 Ditto is open source, and it's built to grow.
 
