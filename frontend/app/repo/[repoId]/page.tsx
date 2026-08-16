@@ -8,7 +8,7 @@ import { JscpdStrip } from '@/components/map/jscpd-strip';
 import { RepoHeader } from '@/components/map/repo-header';
 import { TruncationNotice } from '@/components/map/truncation-notice';
 import { CachedAnalysisNote } from '@/components/map/cached-analysis-note';
-import { Database, ShieldAlert } from 'lucide-react';
+import { Database } from 'lucide-react';
 
 // Live backend data, rendered per request (never prerendered at build).
 export const dynamic = 'force-dynamic';
