@@ -12,9 +12,9 @@ import { PortfolioEvidence } from '@/components/landing/portfolio-evidence';
 import { GuardRoadmapCard } from '@/components/landing/guard-roadmap-card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { 
-  Code2, Cpu, ShieldAlert, Sparkles, Terminal, Zap, 
-  GitPullRequest, Layers, ShieldCheck, CheckCircle2, 
-  Milestone, BrainCircuit, ShieldAlert as AlertIcon, Info
+  Code2, Cpu, ShieldAlert, Sparkles, Terminal, 
+  GitPullRequest, Layers, ShieldCheck, 
+  Milestone, BrainCircuit,
 } from 'lucide-react';
 
 export const metadata: Metadata = {
