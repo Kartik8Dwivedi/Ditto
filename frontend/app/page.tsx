@@ -367,7 +367,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-4 w-auto shrink-0 opacity-70" />
             <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-4 w-auto shrink-0 opacity-70" />
-            <span>© 2026 Ditto Labs</span>
+            <span>© {new Date().getFullYear()} Ditto Labs</span>
           </div>
           <div className="flex items-center gap-4 font-mono">
             <a href="https://github.com/cline/cline" target="_blank" rel="noreferrer" className="hover:text-ink">Cline Repo</a>
