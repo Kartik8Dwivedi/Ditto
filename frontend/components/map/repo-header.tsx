@@ -5,11 +5,6 @@ import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { CopyLinkButton } from '@/components/ui/copy-link-button';
 
-/**
- * Absolute, in UTC, rather than "4h ago" — a relative label computed on the
- * server drifts or freezes depending on when the page was rendered, and a
- * timestamp that quietly lies about freshness is not worth the charm.
- */
 function formatIndexedAt(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
