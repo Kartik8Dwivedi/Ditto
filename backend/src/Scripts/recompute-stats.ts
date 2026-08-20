@@ -18,8 +18,16 @@ import logger from '../Config/logger.js';
  */
 
 const main = async (): Promise<void> => {
-  const slug = process.argv[2] ?? 'cline/cline';
-  const [owner, name] = slug.split('/');
+  const slug = process.argv[2] 
+  
+  if (!slug) {
+    throw new Error(`Missing <owner>/<repo>.`);
+  }
+  
+  const [owner,name, ...rest] = slug.split('/');
+  if (!owner || !name || rest.length > 0) {
+    throw new Error(`"${slug}" is not <owner>/<repo>.`);
+  }
 
   await connectToDB();
   try {
