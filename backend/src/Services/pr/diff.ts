@@ -1,5 +1,4 @@
-import { extractFromSource } from '../indexer/extract.js';
-import { isSourceFile } from '../indexer/filter.js';
+import { tsMorphAdapter } from '../indexer/language/adapter.js';
 import type { ExtractedFunction } from '../../Models/contracts.js';
 
 /**
@@ -76,7 +75,7 @@ export const changedSourceRanges = (files: PrFile[]): Map<string, LineRange[]> =
   const byFile = new Map<string, LineRange[]>();
   for (const file of files) {
     if (file.status === 'removed') continue;
-    if (!isSourceFile(file.filename)) continue;
+    if (!tsMorphAdapter.isSourceFile(file.filename)) continue;
     const ranges = addedRanges(file.patch);
     if (ranges.length > 0) byFile.set(file.filename, ranges);
   }
@@ -101,7 +100,7 @@ export const selectChangedFunctions = (inputs: ChangedFileInput[]): ExtractedFun
   const changed: ExtractedFunction[] = [];
   for (const { file, contents, ranges } of inputs) {
     if (ranges.length === 0) continue;
-    const { functions } = extractFromSource(file, contents);
+    const { functions } = tsMorphAdapter.extract(file, contents);
     for (const fn of functions) {
       if (ranges.some((range) => overlaps(range, [fn.startLine, fn.endLine]))) {
         changed.push(fn);
