@@ -3,8 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { fetchRepoFiles } from './github.js';
-import { isSourceFile } from './filter.js';
-import { extractFromSource } from './extract.js';
+import { tsMorphAdapter } from './language/adapter.js';
 import logger from '../../Config/logger.js';
 import type { ExtractedFunction, StageReporter } from '../../Models/contracts.js';
 
@@ -98,8 +97,10 @@ class IndexerService {
     logger.info(
       `fetching ${owner}/${name}${branch ? `@${branch}` : ''}${scope ? ` (scope: ${scope})` : ''}...`
     );
-    const repo = await fetchRepoFiles({ owner, name, branch, scope, accept: isSourceFile });
-    logger.info(`[1/2] fetched ${repo.files.size} source files at commit ${repo.commit.slice(0, 7)}`);
+    const repo = await fetchRepoFiles({ owner, name, branch, scope, accept: tsMorphAdapter.isSourceFile });
+    logger.info(
+      `[1/2] fetched ${repo.files.size} source files at commit ${repo.commit.slice(0, 7)}`
+    );
 
     for (const entry of repo.skipped) {
       logger.warn(`skipped ${entry.file}: ${entry.reason}`);
@@ -112,7 +113,7 @@ class IndexerService {
 
     for (const [file, contents] of repo.files) {
       try {
-        const result = extractFromSource(file, contents);
+        const result = tsMorphAdapter.extract(file, contents);
         functions.push(...result.functions);
         for (const skip of result.skipped) {
           skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
