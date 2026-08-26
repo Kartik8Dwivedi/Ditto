@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Scissors, TriangleAlert, X } from 'lucide-react';
+import { RotateCw, Scissors, TriangleAlert, X } from 'lucide-react';
 import type { ClusterDetail } from '@/types/ditto';
 import { cn } from '@/lib/utils';
 import { verdictFor } from '@/lib/cluster-verdict';
@@ -69,6 +69,7 @@ function ClusterDrawerContent({
 }) {
   const [cluster, setCluster] = useState<ClusterDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   // Goes through the real contract endpoint (GET /clusters/:id), so nothing
   // here changes when the backend lands.
@@ -88,13 +89,25 @@ function ClusterDrawerContent({
     return () => {
       cancelled = true;
     };
-  }, [clusterId]);
+  }, [clusterId, attempt]);
 
   if (error) {
     return (
       <DrawerMessage onClose={onClose}>
         <TriangleAlert className="size-5 text-danger" />
         <p className="text-ink">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setCluster(null);
+            setError(null);
+            setAttempt((prev) => prev + 1)
+          }}
+          className="inline-flex items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 font-mono text-[12px] text-ink transition-colors duration-150 hover:bg-inset"
+        >
+          <RotateCw aria-hidden className="size-3" />
+          Try again
+        </button>
       </DrawerMessage>
     );
   }
