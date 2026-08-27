@@ -85,13 +85,13 @@ with `ts.transpileModule` before executing. `body` stays verbatim for display.
 ## Verify
 
 ```bash
-npm run typecheck && npm run lint && npm test    # 120 tests, all mocked/offline
+npm run typecheck && npm run lint && npm test    # all tests mocked/offline
 npx tsx src/Scripts/verify-pipeline.ts           # full pipeline vs fixture, LLM mocked, Mongo + execution real
 ```
 
 ## Definition of Done — status
 
-- [x] `typecheck`, `lint`, `test` pass clean (120 tests)
+- [x] `typecheck`, `lint`, `test` pass clean (all tests mocked/offline)
 - [x] Every LLM output Zod-validated via strict Structured Outputs; no free-text JSON parsing
 - [x] Fingerprints + embeddings cached by `bodyHash` (re-run is free; unit-tested)
 - [x] `probe` executes ONLY pure functions and sets `executed` truthfully
