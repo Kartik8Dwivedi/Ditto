@@ -103,6 +103,7 @@ export function GuardRoadmapCard() {
             placeholder="https://github.com/owner/repo/pull/123"
             aria-label="GitHub pull request URL"
             aria-invalid={error !== null}
+            aria-describedby={error ? 'guard-roadmap-error' : undefined}
             disabled={busy}
             className={cn(
               'h-9 w-full rounded-md border bg-canvas pr-3 pl-9 font-mono text-[13px] text-ink',
@@ -133,6 +134,7 @@ export function GuardRoadmapCard() {
       {error && (
         <p
           role="alert"
+          id="guard-roadmap-error"
           className="animate-fade-in mt-2 flex items-start gap-2 rounded-md border border-danger-line bg-danger-bg/40 px-3 py-2 text-[12px] leading-relaxed text-ink-muted"
         >
           <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0 text-danger" />
