@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "index": "tsx src/Scripts/index-repo.ts",
     "pipeline": "tsx src/Scripts/pipeline.ts",
+    "doctor": "tsx src/Scripts/doctor.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
