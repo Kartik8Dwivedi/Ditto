@@ -24,18 +24,21 @@ interface CliArgs {
   name: string;
   cacheDir?: string;
   maxFunctions?: number;
+  json?: boolean;
 }
 
 const usage = `Usage: npm run pipeline -- <owner>/<repo> [--cache-dir <path>] [--max <n>]
 
   <owner>/<repo>     the repo to analyse; reads backend/.cache/<owner>-<repo>.json
   --cache-dir <path> where the extractor wrote its cache (default: backend/.cache)
-  --max <n>          cap the number of functions analysed`;
+  --max <n>          cap the number of functions analysed
+  --json             emit results as machine-readable JSON to stdout`;
 
 const parseArgs = (argv: string[]): CliArgs => {
   let slug: string | undefined;
   let cacheDir: string | undefined;
   let maxFunctions: number | undefined;
+  let json = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -45,6 +48,8 @@ const parseArgs = (argv: string[]): CliArgs => {
     } else if (arg === '--max') {
       maxFunctions = Number(argv[i + 1]);
       i += 1;
+    } else if (arg === '--json') {
+      json = true;
     } else if (!arg.startsWith('--')) {
       slug ??= arg;
     }
@@ -63,10 +68,15 @@ const parseArgs = (argv: string[]): CliArgs => {
     throw new Error(`--max needs a positive integer.\n\n${usage}`);
   }
 
-  return { owner, name, cacheDir, maxFunctions };
+  return { owner, name, cacheDir, maxFunctions, json };
 };
 
-const printReport = (report: PipelineReport): void => {
+const printReport = (report: PipelineReport,json = false): void => {
+  if (json) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  
   const {
     stats,
     fingerprints,
@@ -129,7 +139,7 @@ const main = async (): Promise<void> => {
   await connectToDB();
   try {
     const report = await new PipelineService().run(args);
-    printReport(report);
+    printReport(report, args.json);
   } finally {
     await disconnectFromDB();
   }
