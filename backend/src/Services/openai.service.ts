@@ -255,7 +255,13 @@ class OpenAIService {
     // The API returns an `index` per row; sort by it rather than trusting order.
     return [...response.data].sort((a, b) => a.index - b.index).map((row) => row.embedding);
   }
-
+  
+  /** Lightweight connectivity preflight check - lists models with zero token spend. */
+  async ping(): Promise<boolean> {
+    await this.client.models.list();
+    return true;
+  }
+  
   /** One completion call: strict schema down, raw JSON text back. */
   private async complete<T extends z.ZodType>(
     model: string,
