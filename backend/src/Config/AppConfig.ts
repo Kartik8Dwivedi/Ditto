@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import RateLimiter from './rateLimiter.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * Validate and coerce environment variables ONCE at startup. Failing fast here

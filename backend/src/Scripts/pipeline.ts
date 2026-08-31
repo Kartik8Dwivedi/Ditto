@@ -71,7 +71,7 @@ const parseArgs = (argv: string[]): CliArgs => {
   return { owner, name, cacheDir, maxFunctions, json };
 };
 
-const printReport = (report: PipelineReport,json = false): void => {
+const printReport = (report: PipelineReport, json = false): void => {
   if (json) {
     console.log(JSON.stringify(report, null, 2));
     return;
