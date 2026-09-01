@@ -7,6 +7,9 @@ import { verdictFor } from '@/lib/cluster-verdict';
 import { useClusterDrawer } from '@/stores/cluster.store';
 import { Badge } from '@/components/ui/badge';
 import { ClusterDrawer } from '@/components/cluster/cluster-drawer';
+import { sortByRisk } from '@/lib/mocks/derive';
+import { useMemo, useState } from 'react';
+import { ClusterToolbar, SortOption } from './cluster-toolbar';
 
 function ClusterRow({ cluster, index }: { cluster: ClusterSummary; index: number }) {
   const openCluster = useClusterDrawer((s) => s.openCluster);
@@ -82,6 +85,41 @@ function ClusterRow({ cluster, index }: { cluster: ClusterSummary; index: number
 }
 
 export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
+  const [search, setSearch] = useState('');
+  const [selectedVerdict, setSelectedVerdict] = useState<string>('all');
+  const [provenOnly, setProvenOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('risk');
+
+  const visibleClusters = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    const filtered = clusters.filter((cluster) => {
+      if (provenOnly && !cluster.hasProvenDivergence) {
+        return false;
+      }
+
+      if (selectedVerdict !== 'all') {
+        const verdict = verdictFor(cluster);
+        if (verdict.label !== selectedVerdict) return false;
+      }
+
+      if (query.length > 0) {
+        const matchDomain = cluster.domain.toLowerCase().includes(query);
+        const matchSummary = cluster.behaviorSummary.toLowerCase().includes(query);
+        if (!matchDomain && !matchSummary) return false;
+      }
+      return true;
+    });
+
+    if (sortBy === 'confidence') {
+      return filtered.sort((a, b) => b.confidence - a.confidence);
+    }
+    if (sortBy === 'members') {
+      return filtered.sort((a, b) => b.memberCount - a.memberCount);
+    }
+    return sortByRisk(filtered);
+  }, [clusters, search, selectedVerdict, provenOnly, sortBy]);
+    
   if (clusters.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-10 text-center">
@@ -96,6 +134,19 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
 
   return (
     <>
+      <ClusterToolbar
+         search={search}
+         onSearchChange={setSearch}
+         selectedVerdict={selectedVerdict}
+         onVerdictChange={setSelectedVerdict}
+         provenOnly={provenOnly}
+         onProvenOnlyToggle={() => setProvenOnly((prev) => !prev)}
+         sortBy={sortBy}
+         onSortByChange={setSortBy}
+         totalCount={clusters.length}
+         filteredCount={visibleClusters.length}
+      />
+       
       <div className="overflow-hidden rounded-lg border border-line bg-panel">
         <header className="flex items-center gap-3 border-b border-line bg-inset/60 px-4 py-1.5">
           <span aria-hidden className="size-1.5 shrink-0" />
@@ -117,9 +168,26 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
           <span aria-hidden className="size-3.5 shrink-0" />
         </header>
 
-        {clusters.map((cluster, index) => (
-          <ClusterRow key={cluster.id} cluster={cluster} index={index} />
-        ))}
+        {visibleClusters.length > 0 ? (
+          visibleClusters.map((cluster, index) => (
+            <ClusterRow key={cluster.id} cluster={cluster} index={index} />
+          ))
+        ) : (
+          <div className="px-4 py-10 text-center">
+            <p className="text-[13px] text-ink">No duplicate clusters match your filters.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setSelectedVerdict('all');
+                setProvenOnly(false);
+              }}
+              className="mt-2 text-[12px] text-accent hover:underline"
+            >
+              Reset all filters
+            </button>
+          </div>
+        )}
       </div>
 
       <ClusterDrawer />
