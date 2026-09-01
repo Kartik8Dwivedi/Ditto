@@ -339,6 +339,18 @@ Issues and pull requests are welcome and will be read by humans who are glad you
 
 ---
 
+## Contributors
+
+Ditto is better for the people who've shown up to build it — every fix, feature, and refactor here shipped from someone who didn't have to. Thank you. 🙏
+
+<a href="https://github.com/Kartik8Dwivedi/Ditto/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Kartik8Dwivedi/Ditto" alt="Ditto contributors" />
+</a>
+
+New here? Grab a [good first issue](https://github.com/Kartik8Dwivedi/Ditto/labels/good%20first%20issue) — the [Contribute](#contribute) section above has the on-ramp.
+
+---
+
 ## Tech stack
 
 - **Indexer + pipeline** — Node, `ts-morph`. Runs locally, writes to MongoDB Atlas. Deliberately never deployed, so the runtime never clones a repo and the demo can't fail on a cold start.
