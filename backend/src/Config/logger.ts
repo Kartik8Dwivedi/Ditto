@@ -10,7 +10,7 @@ class Logger {
   private logWithColor(colorFn: ChalkInstance, label: string, ...args: unknown[]): void {
     const timestamp = new Date().toISOString();
     const coloredLabel = colorFn(`[${label}]`);
-    console.log(`${chalk.gray(timestamp)} ${coloredLabel}`, ...args);
+    console.error(`${chalk.gray(timestamp)} ${coloredLabel}`, ...args);
   }
 
   info(...args: unknown[]): void {
