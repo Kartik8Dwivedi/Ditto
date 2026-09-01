@@ -7,30 +7,48 @@ import type { ChalkInstance } from 'chalk';
  * (pino/winston) when you need JSON logs, log levels, or transports.
  */
 class Logger {
-  private logWithColor(colorFn: ChalkInstance, label: string, ...args: unknown[]): void {
+  private silent = false;
+
+  setSilent(silent: boolean): void {
+    this.silent = silent;
+  }
+  
+  private logWithColor(
+    stream: 'stdout' | 'stderr',
+    colorFn: ChalkInstance,
+    label: string,
+    ...args: unknown[]
+  ): void {
+    if (this.silent) return;
     const timestamp = new Date().toISOString();
     const coloredLabel = colorFn(`[${label}]`);
-    console.error(`${chalk.gray(timestamp)} ${coloredLabel}`, ...args);
+    const formatted = `${chalk.gray(timestamp)} ${coloredLabel}`;
+
+    if (stream === 'stderr') {
+      console.error(formatted, ...args);
+    } else {
+      console.log(formatted, ...args);
+    }
   }
 
   info(...args: unknown[]): void {
-    this.logWithColor(chalk.blue, 'INFO', ...args);
+    this.logWithColor('stdout', chalk.blue, 'INFO', ...args);
   }
 
   error(...args: unknown[]): void {
-    this.logWithColor(chalk.red, 'ERROR', ...args);
+    this.logWithColor('stderr', chalk.red, 'ERROR', ...args);
   }
 
   success(...args: unknown[]): void {
-    this.logWithColor(chalk.green, 'SUCCESS', ...args);
+    this.logWithColor('stdout', chalk.green, 'SUCCESS', ...args);
   }
 
   warn(...args: unknown[]): void {
-    this.logWithColor(chalk.yellow, 'WARN', ...args);
+    this.logWithColor('stderr', chalk.yellow, 'WARN', ...args);
   }
 
   log(...args: unknown[]): void {
-    this.logWithColor(chalk.white, 'LOG', ...args);
+    this.logWithColor('stdout' ,chalk.white, 'LOG', ...args);
   }
 }
 

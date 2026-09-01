@@ -136,6 +136,10 @@ const printReport = (report: PipelineReport, json = false): void => {
 const main = async (): Promise<void> => {
   const args = parseArgs(process.argv.slice(2));
 
+  if (args.json) {
+    logger.setSilent(true);
+  }
+
   await connectToDB();
   try {
     const report = await new PipelineService().run(args);
