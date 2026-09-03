@@ -22,3 +22,15 @@ def impure_io(path: str) -> str:
 
 def impure_time() -> str:
     return str(datetime.now())
+
+def sum_squares(items: list) -> int:
+    total = sum([x * x for x in items])
+    return total
+
+def log_and_return(x: str) -> str:
+    print(x)
+    return x.strip()
+
+def calc_hypot(a: float, b: float) -> float:
+    """Compute the Euclidean norm of a 2D vector."""
+    return math.hypot(a, b)
