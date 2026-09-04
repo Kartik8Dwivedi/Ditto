@@ -153,6 +153,7 @@ export const extractPythonFromSource = (file: string, contents: string): Extract
           imports,
           callsExternal: purity.callsExternal,
           isPure: purity.isPure,
+          language: 'python'
         });
       }
     }
