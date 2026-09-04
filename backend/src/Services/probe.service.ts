@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads';
 import { ts } from 'ts-morph';
 
 import logger from '../Config/logger.js';
-import type { DivergenceTable } from '../Models/index.js';
+import type { DivergenceTable, ExtractedFunction } from '../Models/index.js';
 
 /**
  * EXECUTION — deterministic, no LLM, zero tokens. The differentiator.
@@ -49,6 +49,8 @@ export interface ProbeMember {
   body: string;
   /** Purity, from the extractor. The gate on execution. */
   isPure: boolean;
+  /** Source language. Derived from `ExtractedFunction.language` so the two stay in lockstep. */
+  language?: NonNullable<ExtractedFunction['language']>;
   /**
    * Same-file declarations the body needs to run — helpers it calls, constants
    * it reads. Without these a function that is legitimately pure still throws
@@ -366,7 +368,7 @@ class ProbeService {
   async probe(members: ProbeMember[], probeInputs: string[]): Promise<DivergenceTable | undefined> {
     // THE GATE. Impure functions have database calls, network, and dependencies:
     // executing them is both meaningless and a security hole.
-    const pure = members.filter((member) => member.isPure);
+    const pure = members.filter((member) => member.isPure && (member.language ?? 'ts') === 'ts');
     if (pure.length < 2) {
       logger.info(
         `probe skipped: ${pure.length} of ${members.length} members are pure, need at least 2`

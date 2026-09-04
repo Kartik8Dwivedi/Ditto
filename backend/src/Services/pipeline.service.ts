@@ -280,7 +280,12 @@ class PipelineService {
         limit(async (): Promise<Partial<ICluster>> => {
           const members = cluster.memberIds.map((id) => {
             const doc = byId.get(id);
-            return { id, body: doc?.body ?? '', isPure: doc?.isPure ?? false };
+            return {
+              id,
+              body: doc?.body ?? '',
+              isPure: doc?.isPure ?? false,
+              language: (doc?.language as 'ts' | 'python' | undefined) ?? 'ts',
+            };
           });
 
           const divergence = await this.probeService.probe(members, cluster.probeInputs);
