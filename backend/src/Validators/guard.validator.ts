@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ExtractedFunctionSchema } from '../Models/contracts.js';
+
 /**
  * Ditto Guard's request body.
  *
@@ -11,29 +13,17 @@ import { z } from 'zod';
  * The function cap is a cost control: Guard exists to be cheap, and a diff that
  * adds 200 functions is not a pull request we should be fingerprinting on demand.
  */
+const guardFunctionSchema = ExtractedFunctionSchema.partial({
+  bodyHash: true,
+  loc: true,
+});
+
 export const guardCheckSchema = {
   body: z.object({
     owner: z.string().trim().min(1),
     name: z.string().trim().min(1),
     functions: z
-      .array(
-        z.object({
-          name: z.string(),
-          file: z.string(),
-          startLine: z.number().int().nonnegative(),
-          endLine: z.number().int().nonnegative(),
-          signature: z.string().default(''),
-          body: z.string().min(1),
-          bodyHash: z.string().optional(),
-          loc: z.number().int().nonnegative().optional(),
-          isExported: z.boolean().default(false),
-          params: z.array(z.string()).default([]),
-          returnTypeText: z.string().default(''),
-          imports: z.array(z.string()).default([]),
-          callsExternal: z.boolean().default(false),
-          isPure: z.boolean().default(false),
-        })
-      )
+      .array(guardFunctionSchema)
       .min(1, 'At least one function is required')
       .max(25, 'Guard checks the functions a PR adds, not a whole repo'),
   }),

@@ -97,6 +97,19 @@ describe('ProbeService.probe — real execution', () => {
     expect(table).toBeUndefined();
   });
 
+  it('NEVER executes pure Python members (honesty rail — issue #27)', async () => {
+    const table = await new ProbeService().probe(
+      [
+        { id: 'py-add', body: 'function py_add(a, b) { return a + b; }', isPure: true, language: 'python' },
+        { id: 'py-sum', body: 'function py_sum(a, b) { return a + b; }', isPure: true, language: 'python' },
+      ],
+      ['[1, 2]']
+    );
+
+    expect(table).toBeUndefined();
+  });
+
+
   it('will not run a cluster with only one pure member', async () => {
     const functions = await loadFixture();
     const mixed = [...asMembers(functions, ['normalizePhone']), ...asMembers(functions, ['saveUser'])];

@@ -48,6 +48,7 @@ const incoming = {
   imports: [],
   callsExternal: false,
   isPure: true,
+  language: 'ts' as const,
 };
 
 const makeDeps = (opts: {

@@ -57,6 +57,7 @@ const prFunction = (opts: { isPure: boolean }): ExtractedFunction => ({
   imports: [],
   callsExternal: false,
   isPure: opts.isPure,
+  language: 'ts'
 });
 
 const repo = { _id: { toString: () => 'repo-1' }, owner: 'o', name: 'r' };
