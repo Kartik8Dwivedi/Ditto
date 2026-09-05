@@ -6,6 +6,7 @@ import { StatusCodes } from 'http-status-codes';
 import AppConfig from '../../Config/AppConfig.js';
 import logger from '../../Config/logger.js';
 import AppError from '../../Utils/errors/AppError.js';
+import { fetchWithRetry } from '../../Utils/fetchWithRetry.js';
 import type { PrFile } from './diff.js';
 
 /**
@@ -90,7 +91,7 @@ export class HttpGithubPrClient implements GithubPrClient {
       authorization: `Bearer ${AppConfig.GITHUB_TOKEN}`,
     };
 
-    const res = await fetch(url, { headers });
+    const res = await fetchWithRetry(url, { headers });
     if (!res.ok) {
       logger.warn(
         `github ${res.status} for ${url} (ratelimit remaining: ${res.headers.get('x-ratelimit-remaining')})`
