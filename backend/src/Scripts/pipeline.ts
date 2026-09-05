@@ -1,4 +1,5 @@
 import PipelineService, { type PipelineReport } from '../Services/pipeline.service.js';
+import { pathToFileURL } from 'node:url';
 import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import logger from '../Config/logger.js';
 
@@ -34,22 +35,32 @@ const usage = `Usage: npm run pipeline -- <owner>/<repo> [--cache-dir <path>] [-
   --max <n>          cap the number of functions analysed
   --json             emit results as machine-readable JSON to stdout`;
 
-const parseArgs = (argv: string[]): CliArgs => {
+export const parseArgs = (argv: string[]): CliArgs => {
   let slug: string | undefined;
   let cacheDir: string | undefined;
   let maxFunctions: number | undefined;
   let json = false;
 
+  const takesValue = new Set(['--cache-dir', '--max']);
+
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--cache-dir') {
-      cacheDir = argv[i + 1];
-      i += 1;
-    } else if (arg === '--max') {
-      maxFunctions = Number(argv[i + 1]);
+    if (takesValue.has(arg)) {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        const detail = arg === '--cache-dir' ? 'a path' : 'a value';
+        throw new Error(`${arg} needs ${detail}.\n\n${usage}`);
+      }
+      if (arg === '--cache-dir') {
+        cacheDir = value;
+      } else {
+        maxFunctions = Number(value);
+      }
       i += 1;
     } else if (arg === '--json') {
       json = true;
+    } else if (arg.startsWith('--')) {
+      throw new Error(`Unknown flag ${arg}.\n\n${usage}`);
     } else if (!arg.startsWith('--')) {
       slug ??= arg;
     }
@@ -60,9 +71,6 @@ const parseArgs = (argv: string[]): CliArgs => {
   const [owner, name, ...rest] = slug.split('/');
   if (!owner || !name || rest.length > 0) {
     throw new Error(`"${slug}" is not <owner>/<repo>.\n\n${usage}`);
-  }
-  if (cacheDir === undefined && argv.includes('--cache-dir')) {
-    throw new Error(`--cache-dir needs a path.\n\n${usage}`);
   }
   if (maxFunctions !== undefined && (!Number.isInteger(maxFunctions) || maxFunctions < 1)) {
     throw new Error(`--max needs a positive integer.\n\n${usage}`);
@@ -76,7 +84,7 @@ const printReport = (report: PipelineReport, json = false): void => {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
-  
+
   const {
     stats,
     fingerprints,
@@ -149,7 +157,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-main().catch((err: unknown) => {
-  logger.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err: unknown) => {
+    logger.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}
