@@ -235,6 +235,7 @@ export const extractFromSource = (file: string, contents: string): ExtractionRes
       imports,
       callsExternal: verdict?.callsExternal ?? false,
       isPure: verdict?.pure ?? false,
+      language: 'ts',
       ...(preamble ? { preamble } : {}),
     });
   }

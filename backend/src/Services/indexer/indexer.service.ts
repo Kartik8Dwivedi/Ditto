@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { fetchRepoFiles } from './github.js';
-import { tsMorphAdapter } from './language/adapter.js';
+import { isAnySourceFile, adapterFor } from './language/registry.js';
 import logger from '../../Config/logger.js';
 import type { ExtractedFunction, StageReporter } from '../../Models/contracts.js';
 
@@ -97,7 +97,13 @@ class IndexerService {
     logger.info(
       `fetching ${owner}/${name}${branch ? `@${branch}` : ''}${scope ? ` (scope: ${scope})` : ''}...`
     );
-    const repo = await fetchRepoFiles({ owner, name, branch, scope, accept: tsMorphAdapter.isSourceFile });
+    const repo = await fetchRepoFiles({
+      owner,
+      name,
+      branch,
+      scope,
+      accept: isAnySourceFile,
+    });
     logger.info(
       `[1/2] fetched ${repo.files.size} source files at commit ${repo.commit.slice(0, 7)}`
     );
@@ -113,7 +119,9 @@ class IndexerService {
 
     for (const [file, contents] of repo.files) {
       try {
-        const result = tsMorphAdapter.extract(file, contents);
+        const adapter = adapterFor(file);
+        if (!adapter) continue;
+        const result = adapter.extract(file, contents);
         functions.push(...result.functions);
         for (const skip of result.skipped) {
           skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;

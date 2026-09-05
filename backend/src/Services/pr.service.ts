@@ -561,11 +561,12 @@ class PrService {
       if (bothPure) {
         const table = await this.probeService.probe(
           [
-            { id: 'pr', body: fn.body, isPure: fn.isPure, preamble: fn.preamble },
+            { id: 'pr', body: fn.body, isPure: fn.isPure, language: fn.language ?? 'ts', preamble: fn.preamble },
             {
               id: 'baseline',
               body: existingDoc.body,
               isPure: existingDoc.isPure,
+              language: (existingDoc.language as 'ts' | 'python' | undefined) ?? 'ts',
               preamble: existingDoc.preamble,
             },
           ],

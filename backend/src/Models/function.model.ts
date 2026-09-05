@@ -57,6 +57,7 @@ const functionSchema = new mongoose.Schema<IFunction>(
     imports: { type: [String], default: [] },
     callsExternal: { type: Boolean, default: false },
     isPure: { type: Boolean, default: false },
+    language: { type: String, enum: ['ts', 'python'], default: 'ts' },
     fingerprint: { type: fingerprintSchema, default: undefined },
     embedding: { type: [Number], default: undefined },
     embedVersion: { type: String, default: undefined },

@@ -22,6 +22,7 @@ const fn = (overrides: Partial<ExtractedFunction> & { name: string; bodyHash: st
   imports: [],
   callsExternal: false,
   isPure: true,
+  language: 'ts',
   ...overrides,
 });
 

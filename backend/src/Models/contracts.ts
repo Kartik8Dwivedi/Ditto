@@ -54,6 +54,8 @@ export const ExtractedFunctionSchema = z.object({
    * text, because that is what is displayed.
    */
   preamble: z.string().optional(),
+  /** Set by each adapter (`'ts'` or `'python'`). Defaults to `'ts'` for legacy caches. */
+  language: z.enum(['ts', 'python']).optional().default('ts'),
 });
 
 export type ExtractedFunction = z.infer<typeof ExtractedFunctionSchema>;
