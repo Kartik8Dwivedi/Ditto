@@ -6,6 +6,7 @@ import * as tar from 'tar-stream';
 import AppConfig from '../../Config/AppConfig.js';
 import logger from '../../Config/logger.js';
 import AppError from '../../Utils/errors/AppError.js';
+import { fetchWithRetry } from '../../Utils/fetchWithRetry.js';
 
 /**
  * Repo acquisition — GitHub tarball in, source files in memory out.
@@ -74,7 +75,7 @@ const fetchTarball = async (owner: string, name: string, branch?: string): Promi
 
   const failures: string[] = [];
   for (const url of tarballUrls(owner, name, branch)) {
-    const response = await fetch(url, { headers, redirect: 'follow' });
+    const response = await fetchWithRetry(url, { headers, redirect: 'follow' });
     if (response.ok && response.body) return response;
 
     failures.push(`${new URL(url).host} -> ${response.status}`);
