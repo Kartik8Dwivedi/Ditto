@@ -37,6 +37,11 @@ GET  /api/v1/repos               -> RepoSummary[]
 GET  /api/v1/repos/:repoId       -> { repo, stats, clusters }
 GET  /api/v1/clusters/:clusterId -> ClusterDetail (members + divergence table)
 POST /api/v1/guard/check         -> GuardResult   (the PR check)
+POST /api/v1/pr                  -> PrSubmitResult
+GET  /api/v1/pr/:id              -> PrAnalysis
+POST /api/v1/analyze             -> AnalyzeResult
+POST /api/v1/internal/run        -> { ok: boolean }
+GET  /api/v1/jobs/:jobId         -> Job
 ```
 
 ## The stages
