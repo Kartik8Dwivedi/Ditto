@@ -27,6 +27,7 @@ const envSchema = z.object({
   OPENAI_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
   // Only used by the local indexer to raise GitHub's anonymous rate limit.
   GITHUB_TOKEN: z.string().optional(),
+  GITHUB_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
 
   // --- On-demand analysis (see docs/ONDEMAND.md) ---
   // All optional so local `npm run dev` boots WITHOUT Cloud Tasks: when the
@@ -106,6 +107,7 @@ const AppConfig = Object.freeze({
   EMBEDDING_MODEL: env.EMBEDDING_MODEL,
   OPENAI_TIMEOUT_MS: env.OPENAI_TIMEOUT_MS,
   GITHUB_TOKEN: env.GITHUB_TOKEN,
+  GITHUB_TIMEOUT_MS: env.GITHUB_TIMEOUT_MS,
   GCP_PROJECT: env.GCP_PROJECT,
   TASKS_LOCATION: env.TASKS_LOCATION,
   TASKS_QUEUE: env.TASKS_QUEUE,

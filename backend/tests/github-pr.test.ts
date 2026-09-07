@@ -1,4 +1,7 @@
 import { gzipSync } from 'node:zlib';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as tar from 'tar-stream';
@@ -11,6 +14,7 @@ import { fetchWithRetry } from '../src/Utils/fetchWithRetry.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 /**
@@ -26,7 +30,9 @@ afterEach(() => {
 describe('HttpGithubPrClient', () => {
   // Read from the tracked test fixtures, not the gitignored .cache, so the suite
   // is hermetic in CI (no token, no network — a cache HIT never needs a token).
-  const client = new HttpGithubPrClient(fileURLToPath(new URL('./fixtures/pr-probe/', import.meta.url)));
+  const client = new HttpGithubPrClient(
+    fileURLToPath(new URL('./fixtures/pr-probe/', import.meta.url))
+  );
 
   it('serves cached PR changed-files with NO token (fixtures need no GITHUB_TOKEN)', async () => {
     const files = await client.getChangedFiles('cline', 'cline', 12068);
@@ -47,6 +53,35 @@ describe('HttpGithubPrClient', () => {
     await expect(client.getChangedFiles('cline', 'cline', 999999)).rejects.toThrow(
       /GITHUB_TOKEN is required/
     );
+  });
+
+  it('turns a stalled LIVE fetch into an actionable gateway-timeout error', async () => {
+    const cacheDir = await mkdtemp(path.join(tmpdir(), 'ditto-github-pr-'));
+    const controller = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((_input, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const liveClient = new HttpGithubPrClient(cacheDir, 'test-token');
+      const request = liveClient.getChangedFiles('example', 'repo', 42);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+      controller.abort(new DOMException('Timed out', 'TimeoutError'));
+
+      await expect(request).rejects.toMatchObject({
+        statusCode: 504,
+        message: expect.stringMatching(/GitHub request timed out after 30000ms.*Retry/),
+      });
+      expect(timeoutSpy).toHaveBeenCalledWith(30_000);
+      expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -91,7 +126,9 @@ describe('GitHub tarball fetching', () => {
   });
 
   it('does not retry client errors and stops after three transient attempts', async () => {
-    const clientErrorFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 }));
+    const clientErrorFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 404 }));
     vi.stubGlobal('fetch', clientErrorFetch);
 
     const notFound = await fetchWithRetry('https://example.test/not-found');
@@ -113,12 +150,14 @@ describe('GitHub tarball fetching', () => {
   it('does not retry an aborted request', async () => {
     const controller = new AbortController();
     controller.abort();
-    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new DOMException('Aborted', 'AbortError'));
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new DOMException('Aborted', 'AbortError'));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(fetchWithRetry('https://example.test/aborted', { signal: controller.signal })).rejects.toThrow(
-      'Aborted'
-    );
+    await expect(
+      fetchWithRetry('https://example.test/aborted', { signal: controller.signal })
+    ).rejects.toThrow('Aborted');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
