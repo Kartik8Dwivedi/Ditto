@@ -40,7 +40,7 @@ it to the API, waits for the result, and posts a comment when it finds reinvente
 | `github-token` | `${{ github.token }}` | Token used to post the PR comment. Needs `pull-requests: write`. |
 | `fail-on` | `none` | `none` (advisory) · `duplicate` (fail if any reinvented function is found) · `proven-divergence` (fail only when execution proves a disagreement). |
 | `timeout-seconds` | `300` | Max wait. The **first** PR on a repo Ditto has never seen indexes the whole repo once, which can be slow; later PRs are fast. |
-| `comment` | `true` | Post a PR comment when reinvented functions are found. The job summary is always written. |
+| `comment` | `true` | Post/update a sticky PR comment when reinvented functions are found (updated in-place on re-pushes, flips to ✅ when resolved). The job summary is always written. |
 
 ## What a finding looks like
 
