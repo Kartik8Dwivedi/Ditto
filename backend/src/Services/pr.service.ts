@@ -17,11 +17,7 @@ import {
 } from './cluster.service.js';
 import { CONFIDENCE_THRESHOLD, moduleOf } from './stats.service.js';
 import { fetchRepoFiles, type FetchOptions, type FetchedRepo } from './indexer/github.js';
-import {
-  changedSourceRanges,
-  selectChangedFunctions,
-  type ChangedFileInput,
-} from './pr/diff.js';
+import { changedSourceRanges, selectChangedFunctions, type ChangedFileInput } from './pr/diff.js';
 import HttpGithubPrClient, { type GithubPrClient, type PullMeta } from './pr/github-pr.js';
 import {
   RepoRepository,
@@ -44,6 +40,7 @@ import type {
   StageReporter,
 } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
+import { createIgnoreMatcher, parseIgnorePatterns } from './indexer/ignore.js';
 
 /**
  * PER-PR ANALYSIS — Ditto's flagship "did this PR reinvent something?" check.
@@ -285,7 +282,10 @@ class PrService {
   }
 
   /** The PR metadata block stored on a job. */
-  private prBlock(meta: PullMeta, indexedOnDemand: boolean): {
+  private prBlock(
+    meta: PullMeta,
+    indexedOnDemand: boolean
+  ): {
     prNumber: number;
     headSha: string;
     baseSha: string;
@@ -428,11 +428,22 @@ class PrService {
       owner: repo.owner,
       name: repo.name,
       branch: meta.headSha,
-      accept: (path) => wanted.has(path),
+      accept: (path) =>
+        path === '.dittoignore' || path.endsWith('/.dittoignore') || wanted.has(path),
     });
+
+    const rawDittoIgnore = fetched.files.get('.dittoignore');
+    const ignoreMatcher = rawDittoIgnore
+      ? createIgnoreMatcher(parseIgnorePatterns(rawDittoIgnore))
+      : undefined;
 
     const inputs: ChangedFileInput[] = [];
     for (const [file, ranges] of rangesByFile) {
+      if (ignoreMatcher?.isIgnored(file)) {
+        logger.info(`PR guard: skipped ${file}: matched .dittoignore pattern`);
+        continue;
+      }
+
       const contents = fetched.files.get(file);
       if (contents === undefined) {
         logger.warn(`PR head is missing ${file} at ${meta.headSha.slice(0, 7)} — skipping`);
@@ -493,7 +504,10 @@ class PrService {
       cachedFingerprints
     );
     await onStage?.('embed');
-    const { byHash: embeddings } = await this.embeddingService.embedAll(fingerprints, cachedEmbeddings);
+    const { byHash: embeddings } = await this.embeddingService.embedAll(
+      fingerprints,
+      cachedEmbeddings
+    );
 
     const index = existing.map(toClusterable);
     const usedByIndex = await this.buildUsedByIndex(repoId, existing);
@@ -544,7 +558,11 @@ class PrService {
 
       const adjudicated = await this.adjudicateService.adjudicate([
         { id: 'pr', body: fn.body, domain: fingerprint.domain },
-        { id: 'baseline', body: existingDoc.body, domain: existingDoc.fingerprint?.domain ?? 'unknown' },
+        {
+          id: 'baseline',
+          body: existingDoc.body,
+          domain: existingDoc.fingerprint?.domain ?? 'unknown',
+        },
       ]);
       // The flagship says these are NOT the same job — believe it. Novel.
       if (!adjudicated) {
@@ -561,7 +579,13 @@ class PrService {
       if (bothPure) {
         const table = await this.probeService.probe(
           [
-            { id: 'pr', body: fn.body, isPure: fn.isPure, language: fn.language ?? 'ts', preamble: fn.preamble },
+            {
+              id: 'pr',
+              body: fn.body,
+              isPure: fn.isPure,
+              language: fn.language ?? 'ts',
+              preamble: fn.preamble,
+            },
             {
               id: 'baseline',
               body: existingDoc.body,
