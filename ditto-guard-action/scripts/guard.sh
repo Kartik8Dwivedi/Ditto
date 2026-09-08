@@ -15,6 +15,7 @@ API_URL="${API_URL%/}"
 FAIL_ON="${INPUT_FAIL_ON:-none}"
 TIMEOUT="${INPUT_TIMEOUT_SECONDS:-300}"
 COMMENT="${INPUT_COMMENT:-true}"
+MARKER="<!-- ditto-guard -->"
 
 # --- advisory-exit helper: by default a Ditto/infra problem never breaks the build ---
 soft_exit() { # $1 = message
@@ -88,6 +89,7 @@ proven_count="$(jq '[.[] | select(.proof=="executed")] | length' <<<"$findings")
 # --- build the report ---
 report="$(mktemp)"
 {
+  echo "$MARKER"
   echo "## 🔁 Ditto Guard"
   echo ""
   if [[ "$dupe_count" -eq 0 ]]; then
@@ -108,11 +110,22 @@ report="$(mktemp)"
   echo "_Analysed ${changed} changed function(s). Proven = both functions ran in a sandbox and disagreed._"
 } > "$report"
 
-# --- surface it: job summary always, PR comment when there is something to say ---
+# --- surface it: job summary always, PR comment maintained sticky in place ---
 cat "$report" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
-if [[ "$COMMENT" == "true" && "$dupe_count" -gt 0 ]]; then
-  GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh pr comment "$pr_number" --repo "${owner}/${name}" --body-file "$report" \
-    || echo "::warning::Could not post PR comment — ensure the workflow grants 'pull-requests: write'."
+if [[ "$COMMENT" == "true" ]]; then
+  comment_id=""
+  if comments_json="$(GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh api "repos/${owner}/${name}/issues/${pr_number}/comments" --paginate 2>/dev/null)"; then
+    comment_id="$(jq -s -r --arg marker "$MARKER" '[.[][] | select(.body != null and (.body | contains($marker)))] | last | .id // empty' <<<"$comments_json")"
+  fi
+
+  if [[ -n "$comment_id" ]]; then
+    GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh api --method PATCH "repos/${owner}/${name}/issues/comments/${comment_id}" \
+      -F "body=@${report}" >/dev/null \
+      || echo "::warning::Could not update PR comment — ensure the workflow grants 'pull-requests: write'."
+  elif [[ "$dupe_count" -gt 0 ]]; then
+    GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh pr comment "$pr_number" --repo "${owner}/${name}" --body-file "$report" \
+      || echo "::warning::Could not post PR comment — ensure the workflow grants 'pull-requests: write'."
+  fi
 fi
 
 # --- optional gate ---
