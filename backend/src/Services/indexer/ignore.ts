@@ -1,4 +1,4 @@
-import picomatch from 'picomatch';
+import ignore from 'ignore';
 
 export interface IgnoreMatcher {
   /** True when repo-relative path matches one of the ignore patterns */
@@ -30,16 +30,16 @@ export const createIgnoreMatcher = (patterns: string[]): IgnoreMatcher => {
     };
   }
 
-  const normalizedPatterns = patterns.map((p) => (p.startsWith('/') ? p.slice(1) : p));
-  const isMatch = picomatch(normalizedPatterns, { dot: true });
+  // ignore package implements official .gitignore specification
+  const ig = ignore().add(patterns);
 
   return {
     isIgnored: (repoRelativePath: string): boolean => {
-      const cleanPath = repoRelativePath.startsWith('/')
-        ? repoRelativePath.slice(1)
-        : repoRelativePath;
-      return isMatch(cleanPath);
+      // Normalise leading slash or relative prefix for .gitignore evaluation
+      const cleanPath = repoRelativePath.replace(/^\/+/, '');
+      if (!cleanPath) return false;
+      return ig.ignores(cleanPath);
     },
-    patterns: normalizedPatterns,
+    patterns,
   };
 };

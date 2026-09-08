@@ -43,17 +43,35 @@ describe('createIgnoreMatcher', () => {
     expect(matcher.isIgnored('src/legacy/nested/file.ts')).toBe(false);
   });
 
-  it('matches extension patterns and file basenames', () => {
-    const matcher = createIgnoreMatcher(['**/*.shim.ts', 'src/generated/*.ts']);
-    expect(matcher.isIgnored('src/utils/math.shim.ts')).toBe(true);
-    expect(matcher.isIgnored('src/generated/types.ts')).toBe(true);
-    expect(matcher.isIgnored('src/utils/math.ts')).toBe(false);
+  it('matches gitignore-style directory patterns with trailing slash', () => {
+    const matcher = createIgnoreMatcher(['vendor/']);
+    expect(matcher.isIgnored('vendor/lodash/index.js')).toBe(true);
+    expect(matcher.isIgnored('vendor/sub/deep/file.ts')).toBe(true);
+    expect(matcher.isIgnored('src/vendor/nested.ts')).toBe(true);
   });
 
-  it('handles leading slashes gracefully', () => {
-    const matcher = createIgnoreMatcher(['/vendor/**', '/shims/*.ts']);
+  it('matches bare patterns with no slash at any depth (gitignore semantics)', () => {
+    const matcher = createIgnoreMatcher(['*.shim.ts', 'secrets.ts']);
+    expect(matcher.isIgnored('secrets.ts')).toBe(true);
+    expect(matcher.isIgnored('math.shim.ts')).toBe(true);
+    expect(matcher.isIgnored('src/secrets.ts')).toBe(true);
+    expect(matcher.isIgnored('src/utils/nested/secrets.ts')).toBe(true);
+    expect(matcher.isIgnored('src/utils/math.shim.ts')).toBe(true);
+    expect(matcher.isIgnored('src/utils/math.ts')).toBe(false);
+    expect(matcher.isIgnored('src/not-secrets.ts')).toBe(false);
+  });
+
+  it('handles leading slashes and root-anchored patterns', () => {
+    const matcher = createIgnoreMatcher(['/root-only.ts', '/vendor/**']);
+    expect(matcher.isIgnored('root-only.ts')).toBe(true);
+    expect(matcher.isIgnored('src/root-only.ts')).toBe(false);
     expect(matcher.isIgnored('vendor/a.ts')).toBe(true);
-    expect(matcher.isIgnored('shims/b.ts')).toBe(true);
     expect(matcher.isIgnored('/vendor/a.ts')).toBe(true);
+  });
+
+  it('supports negation patterns', () => {
+    const matcher = createIgnoreMatcher(['vendor/**', '!vendor/keep.ts']);
+    expect(matcher.isIgnored('vendor/lodash.js')).toBe(true);
+    expect(matcher.isIgnored('vendor/keep.ts')).toBe(false);
   });
 });
