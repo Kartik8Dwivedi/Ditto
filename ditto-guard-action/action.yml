@@ -23,7 +23,7 @@ inputs:
     required: false
     default: '300'
   comment:
-    description: 'Post a PR comment when reinvented functions are found (`true`/`false`).'
+    description: 'Post and update a sticky PR comment when reinvented functions are found (`true`/`false`).'
     required: false
     default: 'true'
 
