@@ -57,16 +57,12 @@ const prFunction = (opts: { isPure: boolean }): ExtractedFunction => ({
   imports: [],
   callsExternal: false,
   isPure: opts.isPure,
-  language: 'ts'
+  language: 'ts',
 });
 
 const repo = { _id: { toString: () => 'repo-1' }, owner: 'o', name: 'r' };
 
-const makeService = (opts: {
-  existing: unknown[];
-  adjudicate: unknown;
-  clusters?: unknown[];
-}) =>
+const makeService = (opts: { existing: unknown[]; adjudicate: unknown; clusters?: unknown[] }) =>
   new PrService({
     functionRepository: {
       findByRepo: vi.fn().mockResolvedValue(opts.existing),
@@ -105,7 +101,9 @@ describe('PrService.analyzeChangedFunctions', () => {
       adjudicate: MATCHED_ADJUDICATION,
     });
 
-    const findings = await service.analyzeChangedFunctions(repo as never, [prFunction({ isPure: true })]);
+    const findings = await service.analyzeChangedFunctions(repo as never, [
+      prFunction({ isPure: true }),
+    ]);
 
     expect(findings).toHaveLength(1);
     const finding = findings[0];
@@ -127,7 +125,9 @@ describe('PrService.analyzeChangedFunctions', () => {
       adjudicate: MATCHED_ADJUDICATION,
     });
 
-    const findings = await service.analyzeChangedFunctions(repo as never, [prFunction({ isPure: false })]);
+    const findings = await service.analyzeChangedFunctions(repo as never, [
+      prFunction({ isPure: false }),
+    ]);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].proof).toBe('suspected');
@@ -143,7 +143,9 @@ describe('PrService.analyzeChangedFunctions', () => {
       adjudicate: null,
     });
 
-    const findings = await service.analyzeChangedFunctions(repo as never, [prFunction({ isPure: true })]);
+    const findings = await service.analyzeChangedFunctions(repo as never, [
+      prFunction({ isPure: true }),
+    ]);
 
     expect(findings).toHaveLength(1);
     expect(findings[0].verdict).toBe('novel');
@@ -242,7 +244,9 @@ describe('PrService.submit', () => {
       quotaService: { consume } as never,
     });
 
-    await expect(service.submit({ owner: 'o', name: 'r' }, '5.5.5.5')).rejects.toThrow(/Daily limit/);
+    await expect(service.submit({ owner: 'o', name: 'r' }, '5.5.5.5')).rejects.toThrow(
+      /Daily limit/
+    );
     expect(consume).toHaveBeenCalledWith('5.5.5.5', 'pr'); // an indexed repo → the loose PR bucket
     expect(create).not.toHaveBeenCalled();
     expect(getChangedFiles).not.toHaveBeenCalled();
@@ -295,5 +299,68 @@ describe('PrService.runPrJob (index-if-absent worker)', () => {
     expect(setPrChangedFunctions).toHaveBeenCalledWith('job-1', 3);
     expect(markPrDone).toHaveBeenCalledWith('job-1', analysis._id);
     expect(markFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrService.analyze with .dittoignore', () => {
+  const meta = {
+    prNumber: 42,
+    headSha: 'head-sha-123',
+    baseSha: 'base-sha-456',
+    headRef: 'feature/ignore-test',
+    prUrl: 'https://github.com/o/r/pull/42',
+  };
+
+  it('skips changed files matching .dittoignore fetched at head SHA', async () => {
+    const mockChangedFiles = [
+      {
+        filename: 'vendor/shim.ts',
+        status: 'added',
+        patch: '@@ -0,0 +1,3 @@\n+export function shim() {\n+  return 1;\n+}',
+      },
+      {
+        filename: 'src/app.ts',
+        status: 'added',
+        patch: '@@ -0,0 +1,3 @@\n+export function app() {\n+  return 2;\n+}',
+      },
+    ];
+
+    const mockFetchRepoFiles = vi.fn().mockResolvedValue({
+      files: new Map([
+        ['.dittoignore', 'vendor/**'],
+        ['vendor/shim.ts', 'export function shim() {\n  return 1;\n}'],
+        ['src/app.ts', 'export function app() {\n  return 2;\n}'],
+      ]),
+      commit: 'head-sha-123',
+      skipped: [],
+    });
+
+    const createPrAnalysis = vi.fn().mockImplementation((doc) => ({ ...doc, _id: 'pa-1' }));
+
+    const service = new PrService({
+      githubPr: {
+        getChangedFiles: vi.fn().mockResolvedValue(mockChangedFiles),
+      } as never,
+      fetchRepoFiles: mockFetchRepoFiles,
+      prAnalysisRepository: { create: createPrAnalysis } as never,
+    });
+
+    const analyzeSpy = vi.spyOn(service, 'analyzeChangedFunctions').mockResolvedValue([]);
+
+    const result = await service.analyze({ owner: 'o', name: 'r' } as never, meta);
+
+    expect(mockFetchRepoFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        branch: meta.headSha,
+      })
+    );
+
+    expect(analyzeSpy).toHaveBeenCalledTimes(1);
+    const passedFunctions = analyzeSpy.mock.calls[0][1];
+    expect(passedFunctions).toHaveLength(1);
+    expect(passedFunctions[0].name).toBe('app');
+    expect(passedFunctions[0].file).toBe('src/app.ts');
+
+    expect(result.changedFunctions).toBe(1);
   });
 });

@@ -6,6 +6,7 @@ import { fetchRepoFiles } from './github.js';
 import { isAnySourceFile, adapterFor } from './language/registry.js';
 import logger from '../../Config/logger.js';
 import type { ExtractedFunction, StageReporter } from '../../Models/contracts.js';
+import { createIgnoreMatcher, parseIgnorePatterns } from './ignore.js';
 
 /**
  * THE INDEXER — a GitHub repo in, `ExtractedFunction[]` on disk out.
@@ -97,12 +98,14 @@ class IndexerService {
     logger.info(
       `fetching ${owner}/${name}${branch ? `@${branch}` : ''}${scope ? ` (scope: ${scope})` : ''}...`
     );
+    const acceptFile = (path: string): boolean =>
+      path === '.dittoignore' || path.endsWith('/.dittoignore') || isAnySourceFile(path);
     const repo = await fetchRepoFiles({
       owner,
       name,
       branch,
       scope,
-      accept: isAnySourceFile,
+      accept: acceptFile,
     });
     logger.info(
       `[1/2] fetched ${repo.files.size} source files at commit ${repo.commit.slice(0, 7)}`
@@ -112,12 +115,32 @@ class IndexerService {
       logger.warn(`skipped ${entry.file}: ${entry.reason}`);
     }
 
+    const dittoIgnoreContent = repo.files.get('.dittoignore');
+    const ignorePatterns = parseIgnorePatterns(dittoIgnoreContent);
+    const ignoreMatcher = createIgnoreMatcher(ignorePatterns);
+    if (ignorePatterns.length > 0) {
+      logger.info(
+        `loaded .dittoignore with ${ignorePatterns.length} active pattern${ignorePatterns.length > 0 && 's'}`
+      );
+    }
+
     await onStage?.('parse');
     let functions: ExtractedFunction[] = [];
     const skippedByReason: Record<string, number> = {};
     const failed: string[] = [];
 
     for (const [file, contents] of repo.files) {
+      if (file === '.dittoignore' || file.endsWith('/.dittoignore')) {
+        continue;
+      }
+
+      if (ignoreMatcher.isIgnored(file)) {
+        skippedByReason['ignored by .dittoignore'] =
+          (skippedByReason['ignored by .dittoignore'] ?? 0) + 1;
+        logger.info(`skipped ${file}: matched .dittoignore`);
+        continue;
+      }
+
       try {
         const adapter = adapterFor(file);
         if (!adapter) continue;
