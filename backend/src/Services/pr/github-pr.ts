@@ -22,6 +22,34 @@ import type { PrFile } from './diff.js';
 /** `backend/.cache/pr-probe/` — resolves the same under tsx and dist. */
 export const PR_CACHE_DIR = fileURLToPath(new URL('../../../.cache/pr-probe/', import.meta.url));
 
+/** Maximum number of file pages to accumulate for a single PR (100 files/page). */
+export const MAX_PR_FILE_PAGES = 5;
+
+/** Changed files returned from GitHub, with an optional truncation flag when pagination hits the page cap. */
+export type ChangedFiles = PrFile[] & { truncated?: boolean };
+
+/**
+ * Parse GitHub's `Link` header and extract the URL with rel="next", or null.
+ * Example header: `<https://api.github.com/...page=2>; rel="next", <...>; rel="last"`
+ */
+export const parseNextLink = (linkHeader: string | null | undefined): string | null => {
+  if (!linkHeader) return null;
+
+  for (const part of linkHeader.split(',')) {
+    const [rawUrl, ...params] = part.split(';');
+    const isNext = params.some((param) => {
+      const clean = param.trim().toLowerCase().replace(/['"]/g, '');
+      return clean === 'rel=next';
+    });
+
+    if (isNext && rawUrl) {
+      return rawUrl.trim().replace(/^<|>$/g, '');
+    }
+  }
+
+  return null;
+};
+
 /** The subset of GitHub's PR object we use. */
 interface RawPull {
   number: number;
@@ -44,7 +72,7 @@ export interface PullMeta {
 /** The narrow surface PrService depends on, so tests can inject a fake. */
 export interface GithubPrClient {
   resolvePull(owner: string, name: string, prNumber?: number): Promise<PullMeta>;
-  getChangedFiles(owner: string, name: string, prNumber: number): Promise<PrFile[]>;
+  getChangedFiles(owner: string, name: string, prNumber: number): Promise<ChangedFiles>;
 }
 
 const toMeta = (pull: RawPull): PullMeta => ({
@@ -59,7 +87,8 @@ const toMeta = (pull: RawPull): PullMeta => ({
 export class HttpGithubPrClient implements GithubPrClient {
   constructor(
     private readonly cacheDir: string = PR_CACHE_DIR,
-    private readonly token: string | undefined = AppConfig.GITHUB_TOKEN
+    private readonly token: string | undefined = AppConfig.GITHUB_TOKEN,
+    private readonly maxPages: number = MAX_PR_FILE_PAGES
   ) {}
 
   /**
@@ -142,18 +171,69 @@ export class HttpGithubPrClient implements GithubPrClient {
     return toMeta(open);
   }
 
-  async getChangedFiles(owner: string, name: string, prNumber: number): Promise<PrFile[]> {
-    const files = await this.get<PrFile[]>(
-      `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`,
-      `${owner}-${name}-pr-${prNumber}-files`
-    );
-    if (!files) {
+  async getChangedFiles(owner: string, name: string, prNumber: number): Promise<ChangedFiles> {
+    const cacheKey = `${owner}-${name}-pr-${prNumber}-files`;
+    const file = path.join(this.cacheDir, `${cacheKey}.json`);
+    try {
+      const cached = JSON.parse(await readFile(file, 'utf8')) as PrFile[];
+      return Object.assign(cached, { truncated: false });
+    } catch {
+      /* not cached yet */
+    }
+
+    if (!this.token) {
       throw new AppError(
-        `Could not fetch changed files for ${owner}/${name} PR #${prNumber} from GitHub. Set GITHUB_TOKEN to raise the limit.`,
-        StatusCodes.BAD_GATEWAY
+        'A GITHUB_TOKEN is required to fetch pull-request data from GitHub. ' +
+          'Set GITHUB_TOKEN in the environment (a fine-grained token with public-repo read access is enough) and retry.',
+        StatusCodes.SERVICE_UNAVAILABLE
       );
     }
-    return files;
+
+    const headers: Record<string, string> = {
+      'user-agent': 'ditto-pr-agent',
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${this.token}`,
+    };
+
+    let nextUrl: string | null =
+      `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`;
+    const allFiles: PrFile[] = [];
+    let pageCount = 0;
+    let truncated = false;
+
+    while (nextUrl) {
+      const res = await fetchGithub(nextUrl, { headers });
+      if (!res.ok) {
+        logger.warn(
+          `github ${res.status} for ${nextUrl} (ratelimit remaining: ${res.headers.get('x-ratelimit-remaining')})`
+        );
+        throw new AppError(
+          `Could not fetch changed files for ${owner}/${name} PR #${prNumber} from GitHub. Set GITHUB_TOKEN to raise the limit.`,
+          StatusCodes.BAD_GATEWAY
+        );
+      }
+
+      const pageFiles = (await res.json()) as PrFile[];
+      allFiles.push(...pageFiles);
+      pageCount++;
+
+      const linkHeader = res.headers.get('link');
+      const upcomingNextUrl = parseNextLink(linkHeader);
+
+      if (upcomingNextUrl && pageCount >= this.maxPages) {
+        truncated = true;
+        logger.warn(
+          `PR #${prNumber} for ${owner}/${name} changed files truncated: reached max page limit (${this.maxPages} pages, ${allFiles.length} files fetched)`
+        );
+        break;
+      }
+
+      nextUrl = upcomingNextUrl;
+    }
+
+    await mkdir(this.cacheDir, { recursive: true });
+    await writeFile(file, JSON.stringify(allFiles));
+    return Object.assign(allFiles, { truncated });
   }
 }
 
