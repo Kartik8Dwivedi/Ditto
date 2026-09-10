@@ -121,6 +121,25 @@ are recomputed. If a repo's *stored index* is found to be a stale recipe, the gu
 **fails loud** rather than silently cosine-comparing incompatible vectors — a whole-repo
 re-index is the pipeline's job, not something to paper over on the read path.
 
+### Decision: bump `EMBED_VERSION` whenever `buildEmbedText` changes
+`EMBED_VERSION` (in `backend/src/Services/embedding.service.ts`, currently
+`'v2-purpose-shape'`) stamps every stored embedding with the recipe it was built under.
+Because embeddings are cached content-addressed by `bodyHash` unscoped across
+repositories, `bodyHash` does not change when the embed-text recipe changes.
+`EMBED_VERSION` exists so vectors built under an older recipe are never silently
+compared against current ones.
+
+Any contributor modifying `buildEmbedText` (changing included fingerprint fields,
+delimiters, or formatting) **must bump `EMBED_VERSION`**. Bumping it invalidates
+existing cached embeddings on the next run:
+- **Pipeline runs (`pipeline.service.ts`):** detects `repo.embedVersion !== EMBED_VERSION`
+  and recomputes all embeddings for the repository, stamping them with the new version.
+- **Incremental Guard / PR checks (`guard.service.ts`, `pr.service.ts`):** cross-repo
+  cache hits matching an older version are dropped, forcing incoming functions to be
+  re-embedded. Furthermore, if a target repo's stored index carries a stale recipe,
+  Guard and PR checks **fail loud** (`ConflictError`) instead of returning garbage
+  cosine similarities.
+
 ---
 
 ## 5. The honesty model: proven vs suspected
