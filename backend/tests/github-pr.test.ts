@@ -8,13 +8,45 @@ import * as tar from 'tar-stream';
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import logger from '../src/Config/logger.js';
 import { fetchRepoFiles } from '../src/Services/indexer/github.js';
-import HttpGithubPrClient from '../src/Services/pr/github-pr.js';
+import HttpGithubPrClient, { parseNextLink } from '../src/Services/pr/github-pr.js';
 import { fetchWithRetry } from '../src/Utils/fetchWithRetry.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe('parseNextLink', () => {
+  it('extracts next URL from a standard quoted Link header', () => {
+    const header = '<https://api.github.com/repos/o/r/pulls/1/files?page=2>; rel="next"';
+    expect(parseNextLink(header)).toBe('https://api.github.com/repos/o/r/pulls/1/files?page=2');
+  });
+
+  it('extracts next URL when multiple links (prev, next, last) are present', () => {
+    const header =
+      '<https://api.github.com/repos/o/r/pulls/1/files?page=1>; rel="prev", ' +
+      '<https://api.github.com/repos/o/r/pulls/1/files?page=3>; rel="next", ' +
+      '<https://api.github.com/repos/o/r/pulls/1/files?page=5>; rel="last"';
+    expect(parseNextLink(header)).toBe('https://api.github.com/repos/o/r/pulls/1/files?page=3');
+  });
+
+  it('handles unquoted rel=next and case-insensitivity', () => {
+    const header = '<https://api.github.com/repos/o/r/pulls/1/files?page=2>; REL=next';
+    expect(parseNextLink(header)).toBe('https://api.github.com/repos/o/r/pulls/1/files?page=2');
+  });
+
+  it('returns null when rel="next" is not present', () => {
+    const header = '<https://api.github.com/repos/o/r/pulls/1/files?page=1>; rel="prev"';
+    expect(parseNextLink(header)).toBeNull();
+  });
+
+  it('returns null for null, undefined, or empty headers', () => {
+    expect(parseNextLink(null)).toBeNull();
+    expect(parseNextLink(undefined)).toBeNull();
+    expect(parseNextLink('')).toBeNull();
+  });
 });
 
 /**
@@ -38,6 +70,7 @@ describe('HttpGithubPrClient', () => {
     const files = await client.getChangedFiles('cline', 'cline', 12068);
     expect(Array.isArray(files)).toBe(true);
     expect(files.length).toBeGreaterThan(0);
+    expect(files.truncated).toBe(false);
   });
 
   it('resolves the latest open PR from the cached listing with NO token', async () => {
@@ -79,6 +112,114 @@ describe('HttpGithubPrClient', () => {
       });
       expect(timeoutSpy).toHaveBeenCalledWith(30_000);
       expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('follows Link rel="next" to accumulate and merge files across pages and caches the merged array', async () => {
+    const cacheDir = await mkdtemp(path.join(tmpdir(), 'ditto-github-pr-pagination-'));
+    const page1Files = [
+      { sha: 'sha1', filename: 'file1.ts', status: 'modified', additions: 1, deletions: 0, changes: 1 },
+    ];
+    const page2Files = [
+      { sha: 'sha2', filename: 'file2.ts', status: 'added', additions: 10, deletions: 0, changes: 10 },
+    ];
+
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('page=2')) {
+        return new Response(JSON.stringify(page2Files), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(page1Files), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          Link: '<https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=2>; rel="next"',
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const liveClient = new HttpGithubPrClient(cacheDir, 'test-token');
+      const files = await liveClient.getChangedFiles('example', 'repo', 42);
+
+      expect(files).toHaveLength(2);
+      expect(files.map((f) => f.filename)).toEqual(['file1.ts', 'file2.ts']);
+      expect(files.truncated).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // Verify the merged array was cached on disk: second call with no token and no network succeeds
+      fetchMock.mockClear();
+      const cachedClient = new HttpGithubPrClient(cacheDir, undefined);
+      const cachedFiles = await cachedClient.getChangedFiles('example', 'repo', 42);
+      expect(cachedFiles).toHaveLength(2);
+      expect(cachedFiles.map((f) => f.filename)).toEqual(['file1.ts', 'file2.ts']);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('caps pagination at maxPages, sets truncated flag, and logs a structured warning', async () => {
+    const cacheDir = await mkdtemp(path.join(tmpdir(), 'ditto-github-pr-truncation-'));
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const pageFiles = [
+      { sha: 'sha1', filename: 'file1.ts', status: 'modified', additions: 1, deletions: 0, changes: 1 },
+    ];
+
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => {
+      return new Response(JSON.stringify(pageFiles), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          Link: '<https://api.github.com/repos/example/repo/pulls/42/files?per_page=100&page=2>; rel="next"',
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      // With maxPages = 1, it should stop after page 1 even though next link exists
+      const liveClient = new HttpGithubPrClient(cacheDir, 'test-token', 1);
+      const files = await liveClient.getChangedFiles('example', 'repo', 42);
+
+      expect(files).toHaveLength(1);
+      expect(files.truncated).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/PR #42 for example\/repo.*truncated.*max page limit/)
+      );
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns single page without truncation when no next Link header is present', async () => {
+    const cacheDir = await mkdtemp(path.join(tmpdir(), 'ditto-github-pr-single-'));
+    const pageFiles = [
+      { sha: 'sha1', filename: 'file1.ts', status: 'modified', additions: 1, deletions: 0, changes: 1 },
+    ];
+
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(pageFiles), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const liveClient = new HttpGithubPrClient(cacheDir, 'test-token');
+      const files = await liveClient.getChangedFiles('example', 'repo', 42);
+
+      expect(files).toHaveLength(1);
+      expect(files.truncated).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await rm(cacheDir, { recursive: true, force: true });
     }

@@ -22,6 +22,34 @@ import type { PrFile } from './diff.js';
 /** `backend/.cache/pr-probe/` — resolves the same under tsx and dist. */
 export const PR_CACHE_DIR = fileURLToPath(new URL('../../../.cache/pr-probe/', import.meta.url));
 
+/** Maximum number of file pages to accumulate for a single PR (100 files/page). */
+export const MAX_PR_FILE_PAGES = 5;
+
+/** Changed files returned from GitHub, with an optional truncation flag when pagination hits the page cap. */
+export type ChangedFiles = PrFile[] & { truncated?: boolean };
+
+/**
+ * Parse GitHub's `Link` header and extract the URL with rel="next", or null.
+ * Example header: `<https://api.github.com/...page=2>; rel="next", <...>; rel="last"`
+ */
+export const parseNextLink = (linkHeader: string | null | undefined): string | null => {
+  if (!linkHeader) return null;
+
+  for (const part of linkHeader.split(',')) {
+    const [rawUrl, ...params] = part.split(';');
+    const isNext = params.some((param) => {
+      const clean = param.trim().toLowerCase().replace(/['"]/g, '');
+      return clean === 'rel=next';
+    });
+
+    if (isNext && rawUrl) {
+      return rawUrl.trim().replace(/^<|>$/g, '');
+    }
+  }
+
+  return null;
+};
+
 /** The subset of GitHub's PR object we use. */
 interface RawPull {
   number: number;
@@ -44,7 +72,7 @@ export interface PullMeta {
 /** The narrow surface PrService depends on, so tests can inject a fake. */
 export interface GithubPrClient {
   resolvePull(owner: string, name: string, prNumber?: number): Promise<PullMeta>;
-  getChangedFiles(owner: string, name: string, prNumber: number): Promise<PrFile[]>;
+  getChangedFiles(owner: string, name: string, prNumber: number): Promise<ChangedFiles>;
 }
 
 const toMeta = (pull: RawPull): PullMeta => ({
@@ -59,21 +87,32 @@ const toMeta = (pull: RawPull): PullMeta => ({
 export class HttpGithubPrClient implements GithubPrClient {
   constructor(
     private readonly cacheDir: string = PR_CACHE_DIR,
-    private readonly token: string | undefined = AppConfig.GITHUB_TOKEN
+    private readonly token: string | undefined = AppConfig.GITHUB_TOKEN,
+    private readonly maxPages: number = MAX_PR_FILE_PAGES
   ) {}
 
-  /**
-   * GET with a disk cache keyed by a caller-supplied slug. A cache hit is
-   * returned verbatim; a miss fetches, then writes the response for next time.
-   */
-  private async get<T>(url: string, cacheKey: string): Promise<T | null> {
+  /** Read a cached JSON file by key, or return null on miss/error. */
+  private async readCache<T>(cacheKey: string): Promise<T | null> {
     const file = path.join(this.cacheDir, `${cacheKey}.json`);
     try {
       return JSON.parse(await readFile(file, 'utf8')) as T;
     } catch {
-      /* not cached yet */
+      return null;
     }
+  }
 
+  /** Write serializable data to the disk cache under cacheKey. */
+  private async writeCache(cacheKey: string, data: unknown): Promise<void> {
+    const file = path.join(this.cacheDir, `${cacheKey}.json`);
+    await mkdir(this.cacheDir, { recursive: true });
+    await writeFile(file, JSON.stringify(data));
+  }
+
+  /**
+   * Perform an authenticated GET request against GitHub's REST API.
+   * Requires GITHUB_TOKEN and returns the raw Response for header inspection.
+   */
+  private async fetchApi(url: string): Promise<Response> {
     // A LIVE fetch is about to happen (nothing cached). The PR REST endpoints
     // have NO codeload fallback, and anonymous is GitHub's 60/hr shared across
     // Cloud Run's NAT IP — effectively unusable in production. So Stage B makes a
@@ -99,11 +138,26 @@ export class HttpGithubPrClient implements GithubPrClient {
       logger.warn(
         `github ${res.status} for ${url} (ratelimit remaining: ${res.headers.get('x-ratelimit-remaining')})`
       );
+    }
+    return res;
+  }
+
+  /**
+   * GET with a disk cache keyed by a caller-supplied slug. A cache hit is
+   * returned verbatim; a miss fetches, then writes the response for next time.
+   */
+  private async get<T>(url: string, cacheKey: string): Promise<T | null> {
+    const cached = await this.readCache<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const res = await this.fetchApi(url);
+    if (!res.ok) {
       return null;
     }
     const json = (await res.json()) as T;
-    await mkdir(this.cacheDir, { recursive: true });
-    await writeFile(file, JSON.stringify(json));
+    await this.writeCache(cacheKey, json);
     return json;
   }
 
@@ -142,18 +196,48 @@ export class HttpGithubPrClient implements GithubPrClient {
     return toMeta(open);
   }
 
-  async getChangedFiles(owner: string, name: string, prNumber: number): Promise<PrFile[]> {
-    const files = await this.get<PrFile[]>(
-      `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`,
-      `${owner}-${name}-pr-${prNumber}-files`
-    );
-    if (!files) {
-      throw new AppError(
-        `Could not fetch changed files for ${owner}/${name} PR #${prNumber} from GitHub. Set GITHUB_TOKEN to raise the limit.`,
-        StatusCodes.BAD_GATEWAY
-      );
+  async getChangedFiles(owner: string, name: string, prNumber: number): Promise<ChangedFiles> {
+    const cacheKey = `${owner}-${name}-pr-${prNumber}-files`;
+    const cached = await this.readCache<PrFile[]>(cacheKey);
+    if (cached !== null) {
+      return Object.assign(cached, { truncated: false });
     }
-    return files;
+
+    let nextUrl: string | null =
+      `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`;
+    const allFiles: PrFile[] = [];
+    let pageCount = 0;
+    let truncated = false;
+
+    while (nextUrl) {
+      const res = await this.fetchApi(nextUrl);
+      if (!res.ok) {
+        throw new AppError(
+          `Could not fetch changed files for ${owner}/${name} PR #${prNumber} from GitHub. Set GITHUB_TOKEN to raise the limit.`,
+          StatusCodes.BAD_GATEWAY
+        );
+      }
+
+      const pageFiles = (await res.json()) as PrFile[];
+      allFiles.push(...pageFiles);
+      pageCount++;
+
+      const linkHeader = res.headers.get('link');
+      const upcomingNextUrl = parseNextLink(linkHeader);
+
+      if (upcomingNextUrl && pageCount >= this.maxPages) {
+        truncated = true;
+        logger.warn(
+          `PR #${prNumber} for ${owner}/${name} changed files truncated: reached max page limit (${this.maxPages} pages, ${allFiles.length} files fetched)`
+        );
+        break;
+      }
+
+      nextUrl = upcomingNextUrl;
+    }
+
+    await this.writeCache(cacheKey, allFiles);
+    return Object.assign(allFiles, { truncated });
   }
 }
 
