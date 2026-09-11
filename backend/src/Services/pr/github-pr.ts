@@ -91,18 +91,28 @@ export class HttpGithubPrClient implements GithubPrClient {
     private readonly maxPages: number = MAX_PR_FILE_PAGES
   ) {}
 
-  /**
-   * GET with a disk cache keyed by a caller-supplied slug. A cache hit is
-   * returned verbatim; a miss fetches, then writes the response for next time.
-   */
-  private async get<T>(url: string, cacheKey: string): Promise<T | null> {
+  /** Read a cached JSON file by key, or return null on miss/error. */
+  private async readCache<T>(cacheKey: string): Promise<T | null> {
     const file = path.join(this.cacheDir, `${cacheKey}.json`);
     try {
       return JSON.parse(await readFile(file, 'utf8')) as T;
     } catch {
-      /* not cached yet */
+      return null;
     }
+  }
 
+  /** Write serializable data to the disk cache under cacheKey. */
+  private async writeCache(cacheKey: string, data: unknown): Promise<void> {
+    const file = path.join(this.cacheDir, `${cacheKey}.json`);
+    await mkdir(this.cacheDir, { recursive: true });
+    await writeFile(file, JSON.stringify(data));
+  }
+
+  /**
+   * Perform an authenticated GET request against GitHub's REST API.
+   * Requires GITHUB_TOKEN and returns the raw Response for header inspection.
+   */
+  private async fetchApi(url: string): Promise<Response> {
     // A LIVE fetch is about to happen (nothing cached). The PR REST endpoints
     // have NO codeload fallback, and anonymous is GitHub's 60/hr shared across
     // Cloud Run's NAT IP — effectively unusable in production. So Stage B makes a
@@ -128,11 +138,26 @@ export class HttpGithubPrClient implements GithubPrClient {
       logger.warn(
         `github ${res.status} for ${url} (ratelimit remaining: ${res.headers.get('x-ratelimit-remaining')})`
       );
+    }
+    return res;
+  }
+
+  /**
+   * GET with a disk cache keyed by a caller-supplied slug. A cache hit is
+   * returned verbatim; a miss fetches, then writes the response for next time.
+   */
+  private async get<T>(url: string, cacheKey: string): Promise<T | null> {
+    const cached = await this.readCache<T>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const res = await this.fetchApi(url);
+    if (!res.ok) {
       return null;
     }
     const json = (await res.json()) as T;
-    await mkdir(this.cacheDir, { recursive: true });
-    await writeFile(file, JSON.stringify(json));
+    await this.writeCache(cacheKey, json);
     return json;
   }
 
@@ -173,27 +198,10 @@ export class HttpGithubPrClient implements GithubPrClient {
 
   async getChangedFiles(owner: string, name: string, prNumber: number): Promise<ChangedFiles> {
     const cacheKey = `${owner}-${name}-pr-${prNumber}-files`;
-    const file = path.join(this.cacheDir, `${cacheKey}.json`);
-    try {
-      const cached = JSON.parse(await readFile(file, 'utf8')) as PrFile[];
+    const cached = await this.readCache<PrFile[]>(cacheKey);
+    if (cached !== null) {
       return Object.assign(cached, { truncated: false });
-    } catch {
-      /* not cached yet */
     }
-
-    if (!this.token) {
-      throw new AppError(
-        'A GITHUB_TOKEN is required to fetch pull-request data from GitHub. ' +
-          'Set GITHUB_TOKEN in the environment (a fine-grained token with public-repo read access is enough) and retry.',
-        StatusCodes.SERVICE_UNAVAILABLE
-      );
-    }
-
-    const headers: Record<string, string> = {
-      'user-agent': 'ditto-pr-agent',
-      accept: 'application/vnd.github+json',
-      authorization: `Bearer ${this.token}`,
-    };
 
     let nextUrl: string | null =
       `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`;
@@ -202,11 +210,8 @@ export class HttpGithubPrClient implements GithubPrClient {
     let truncated = false;
 
     while (nextUrl) {
-      const res = await fetchGithub(nextUrl, { headers });
+      const res = await this.fetchApi(nextUrl);
       if (!res.ok) {
-        logger.warn(
-          `github ${res.status} for ${nextUrl} (ratelimit remaining: ${res.headers.get('x-ratelimit-remaining')})`
-        );
         throw new AppError(
           `Could not fetch changed files for ${owner}/${name} PR #${prNumber} from GitHub. Set GITHUB_TOKEN to raise the limit.`,
           StatusCodes.BAD_GATEWAY
@@ -231,8 +236,7 @@ export class HttpGithubPrClient implements GithubPrClient {
       nextUrl = upcomingNextUrl;
     }
 
-    await mkdir(this.cacheDir, { recursive: true });
-    await writeFile(file, JSON.stringify(allFiles));
+    await this.writeCache(cacheKey, allFiles);
     return Object.assign(allFiles, { truncated });
   }
 }
