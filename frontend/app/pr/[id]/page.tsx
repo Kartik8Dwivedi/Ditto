@@ -52,6 +52,7 @@ export default async function PrPage(props: PageProps<'/pr/[id]'>) {
   const proven = pr.findings.filter((f) => findingState(f) === 'proven').length;
   const suspected = pr.findings.filter((f) => findingState(f) === 'suspected').length;
   const novel = pr.findings.filter((f) => findingState(f) === 'novel').length;
+  const hasNonNovelFindings = proven > 0 || suspected > 0;
 
   return (
     <div className="relative flex min-h-screen flex-1 flex-col overflow-x-hidden bg-canvas text-ink">
@@ -113,6 +114,20 @@ export default async function PrPage(props: PageProps<'/pr/[id]'>) {
               implementation. That is a good result.
             </p>
           </div>
+        ) : !hasNonNovelFindings ? (
+          <article className="animate-rise rounded-xl border border-success-line/60 bg-success-bg/10 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <CheckCircle2 aria-hidden className="size-4 text-success" />
+              <h2 className="font-mono text-[14px] font-semibold text-ink">
+                No reinvented logic found
+              </h2>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">
+              Ditto analyzed all {pr.changedFunctions} changed function
+              {pr.changedFunctions === 1 ? "" : "s"} and found no reinventions.
+              Every function in this PR is genuinely new.
+            </p>
+          </article>
         ) : (
           <section className="space-y-4">
             {findings.map((finding, index) => (
