@@ -209,6 +209,19 @@ Options:
                      makes clusters vanish and a half-analysed repo looks clean
 ```
 
+#### Ignoring intentional duplicates
+
+Add a `.dittoignore` file at the repository root to exclude files that contain known, intentional duplication. Patterns use gitignore syntax, including comments and negation rules. For example:
+
+```gitignore
+# Generated and vendored code
+vendor/**
+*.generated.ts
+!vendor/keep.ts
+```
+
+Ditto applies the same `.dittoignore` patterns when building the full index and when Ditto Guard analyzes functions changed by a pull request.
+
 ### 2. Configure the backend
 
 ```bash
