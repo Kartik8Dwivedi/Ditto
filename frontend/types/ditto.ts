@@ -258,6 +258,7 @@ export type PrAnalysis = {
   baseSha: string;
   prUrl: string;
   changedFunctions: number;
+  filesTruncated: boolean;
   /** One per changed function that matched (novel ones optional). */
   findings: PrFinding[];
   createdAt: string;

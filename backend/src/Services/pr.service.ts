@@ -411,6 +411,7 @@ class PrService {
       baseSha: meta.baseSha,
       prUrl: meta.prUrl,
       changedFunctions: changedFns.length,
+      filesTruncated: files.truncated === true,
       findings,
     });
   }
@@ -658,6 +659,7 @@ export const toPrAnalysis = (doc: HydratedDocument<IPrAnalysis>): PrAnalysis => 
   baseSha: doc.baseSha,
   prUrl: doc.prUrl,
   changedFunctions: doc.changedFunctions,
+  filesTruncated: doc.filesTruncated,
   findings: doc.findings,
   createdAt: doc.createdAt.toISOString(),
 });

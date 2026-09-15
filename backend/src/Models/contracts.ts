@@ -364,6 +364,8 @@ export type PrAnalysis = {
   prUrl: string;
   /** Count kept after the diff-range filter. */
   changedFunctions: number;
+  /** True when GitHub changed-file pagination hit the safety cap. */
+  filesTruncated: boolean;
   /** One per changed function (novel ones included). */
   findings: PrFinding[];
   createdAt: string;

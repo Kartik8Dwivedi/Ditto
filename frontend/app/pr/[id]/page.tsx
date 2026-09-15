@@ -105,6 +105,13 @@ export default async function PrPage(props: PageProps<'/pr/[id]'>) {
           </div>
         </div>
 
+        {pr.filesTruncated && (
+          <div className="rounded-lg border border-warn-line/60 bg-warn-bg/20 px-4 py-3 text-[12px] text-ink-muted">
+            <span className="font-medium text-warn">Partial analysis.</span> Analysis covered the first
+            500 changed files; the rest were not analyzed.
+          </div>
+        )}
+
         {/* Findings */}
         {findings.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-10 text-center">
