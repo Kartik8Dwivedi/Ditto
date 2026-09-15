@@ -31,14 +31,11 @@ there is something worth judging.
 
 ## Per-token pricing (fill in from your provider's current catalog)
 
-<!-- TODO(Kartik): paste the exact current per-1K-token (or per-1M-token) prices for each
-     model from the OpenAI pricing page so this table is precise and defensible. -->
-
 | Model | Input price | Output price |
 |---|---|---|
-| `gpt-5.4-nano` | _TODO_ | _TODO_ |
-| `gpt-5.6-terra` | _TODO_ | _TODO_ |
-| `text-embedding-3-small` | _TODO_ | n/a |
+| `gpt-5.4-nano` | $0.20 / 1M tokens | $1.25 / 1M tokens |
+| `gpt-5.6-terra` | $2.50 / 1M tokens | $15 / 1M tokens |
+| `text-embedding-3-small` | _pending_ | n/a |
 
 All model calls use **Structured Outputs** with strict JSON schemas (Zod-validated) — the
 model returns typed data, never free text that needs parsing.
