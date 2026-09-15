@@ -50,6 +50,7 @@ npm test               # must pass (194 tests)
 
 # frontend
 cd frontend && npm install
+npm test               # must pass
 npm run build
 ```
 

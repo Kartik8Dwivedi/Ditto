@@ -1,14 +1,15 @@
 import { cn } from '@/lib/utils';
 import { CountUp } from './count-up';
 
-function band(score: number) {
+/** Exported so the Markdown report (lib/repo-report.ts) names the same band. */
+export function scoreBand(score: number) {
   if (score >= 80) return { text: 'text-success', bar: 'bg-success', note: 'Healthy' };
   if (score >= 50) return { text: 'text-warn', bar: 'bg-warn', note: 'Needs Consolidation' };
   return { text: 'text-danger', bar: 'bg-danger', note: 'High Duplication Risk' };
 }
 
 export function DittoScore({ score }: { score: number }) {
-  const tone = band(score);
+  const tone = scoreBand(score);
 
   return (
     <section className="relative overflow-hidden rounded-xl border border-line bg-gradient-to-b from-panel to-inset p-5 shadow-sm">

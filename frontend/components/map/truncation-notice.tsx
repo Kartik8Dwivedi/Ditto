@@ -9,12 +9,16 @@ import type { RepoStats } from '@/types/ditto';
  * cline, where the two are equal) it renders nothing. Never a hardcoded cap:
  * the numbers come straight from the backend.
  */
-export function TruncationNotice({ stats }: { stats: RepoStats }) {
+export function isPartialAnalysis(stats: RepoStats): boolean {
   // Repos analysed before these fields existed report 0/0 (cline does today).
   // Treat unset as "no truncation known" rather than rendering a claim like
   // "the first 0 of 2,654 functions", which would be alarming and false.
-  if (!(stats.functionsTotal > 0) || !(stats.functionsAnalyzed > 0)) return null;
-  if (stats.functionsAnalyzed >= stats.functionsTotal) return null;
+  if (!(stats.functionsTotal > 0) || !(stats.functionsAnalyzed > 0)) return false;
+  return stats.functionsAnalyzed < stats.functionsTotal;
+}
+
+export function TruncationNotice({ stats }: { stats: RepoStats }) {
+  if (!isPartialAnalysis(stats)) return null;
 
   return (
     <aside className="flex items-start gap-2.5 rounded-lg border border-warn-line bg-warn-bg/50 px-4 py-2.5">

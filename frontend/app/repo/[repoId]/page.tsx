@@ -52,7 +52,7 @@ export default async function RepoPage(props: PageProps<'/repo/[repoId]'>) {
       <div className="absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-accent/6 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-10 left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-danger/4 blur-[100px] pointer-events-none" />
 
-      <RepoHeader repo={repo} />
+      <RepoHeader repo={repo} report={data} />
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-8 lg:flex-row">
         {/* Sidebar */}

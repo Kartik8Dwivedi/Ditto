@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { GitBranch } from 'lucide-react';
-import type { RepoSummary } from '@/types/ditto';
+import type { RepoDetail, RepoSummary } from '@/types/ditto';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { CopyLinkButton } from '@/components/ui/copy-link-button';
+import { ExportReportButton } from './export-report-button';
 
 /**
  * Absolute, in UTC, rather than "4h ago" — a relative label computed on the
@@ -24,7 +25,14 @@ function formatIndexedAt(iso: string): string {
   }).format(date);
 }
 
-export function RepoHeader({ repo }: { repo: RepoSummary }) {
+export function RepoHeader({
+  repo,
+  report,
+}: {
+  repo: RepoSummary;
+  /** The map's findings. When present, the header offers them as a Markdown export. */
+  report?: RepoDetail;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-12 w-full max-w-[1440px] items-center gap-4 px-6">
@@ -63,6 +71,8 @@ export function RepoHeader({ repo }: { repo: RepoSummary }) {
           <MockDataNotice />
 
           <CopyLinkButton />
+
+          {report && <ExportReportButton report={report} />}
 
           <span className="hidden font-mono text-[11px] text-ink-subtle sm:inline">
             indexed {formatIndexedAt(repo.indexedAt)} UTC
