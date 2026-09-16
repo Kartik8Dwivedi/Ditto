@@ -1,4 +1,6 @@
-import { Fragment } from 'react';
+'use client';
+
+import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TOKEN_COLOR, tokenizeLines } from '@/lib/highlight';
 
@@ -16,6 +18,9 @@ export function CodeBlock({
   className?: string;
 }) {
   const lines = tokenizeLines(code.replace(/\n$/, ''));
+  const [expanded, setExpanded] = useState(false);
+  const collapsible = lines.length > 20;
+  const visibleLines = collapsible && !expanded ? lines.slice(0, 20) : lines;
   const gutterWidth = String(startLine + lines.length - 1).length;
 
   return (
@@ -23,7 +28,7 @@ export function CodeBlock({
       className={cn('overflow-x-auto bg-inset font-mono text-[12px] leading-[1.6] text-ink', className)}
     >
       <code className="block min-w-max py-2">
-        {lines.map((tokens, index) => (
+        {visibleLines.map((tokens, index) => (
           <div key={index} className="flex px-3 hover:bg-line/40">
             <span
               aria-hidden
@@ -48,6 +53,16 @@ export function CodeBlock({
           </div>
         ))}
       </code>
+      {collapsible && (
+        <button
+          type="button"
+          className="mx-3 mb-2 text-xs text-accent hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+        >
+          {expanded ? 'Show less' : 'Show full function'}
+        </button>
+      )}
     </pre>
   );
 }
