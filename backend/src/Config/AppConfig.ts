@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+import logger from './logger.js';
 import RateLimiter from './rateLimiter.js';
 
 dotenv.config({ quiet: true });
@@ -93,6 +94,20 @@ if (!parsed.success) {
 }
 
 const env = parsed.data;
+
+const cloudTasksVars = [
+  'GCP_PROJECT',
+  'TASKS_LOCATION',
+  'TASKS_QUEUE',
+  'SERVICE_URL',
+  'TASK_SECRET',
+] as const;
+const configuredCloudTasksVars = cloudTasksVars.filter((name) => env[name] !== undefined);
+
+if (configuredCloudTasksVars.length > 0 && configuredCloudTasksVars.length < cloudTasksVars.length) {
+  const missing = cloudTasksVars.filter((name) => env[name] === undefined);
+  logger.warn(`Cloud Tasks is partially configured; missing: ${missing.join(', ')}`);
+}
 
 /** Frozen, fully-typed application configuration. Nothing else reads process.env. */
 const AppConfig = Object.freeze({
