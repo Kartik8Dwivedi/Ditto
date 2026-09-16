@@ -72,6 +72,7 @@ export type ClusterMember = {
   body: string;
   loc: number;
   isPure: boolean;
+  language?: 'ts' | 'python';
   isCanonical: boolean;
   /**
    * Provenance (docs/RESUME_BUILD.md §3.3). `'pr'` marks the function a pull

@@ -290,6 +290,7 @@ export type ClusterDetail = ClusterSummary & {
     body: string;
     loc: number;
     isPure: boolean;
+    language: 'ts' | 'python';
     isCanonical: boolean;
     /**
      * Provenance — the ONLY additive change to an existing member shape (§3.3).
