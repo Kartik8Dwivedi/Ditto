@@ -67,10 +67,29 @@ describe('HttpGithubPrClient', () => {
   );
 
   it('serves cached PR changed-files with NO token (fixtures need no GITHUB_TOKEN)', async () => {
+    const infoSpy = vi.spyOn(logger, 'info');
     const files = await client.getChangedFiles('cline', 'cline', 12068);
     expect(Array.isArray(files)).toBe(true);
     expect(files.length).toBeGreaterThan(0);
     expect(files.truncated).toBe(false);
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('cache hit'));
+  });
+
+  it('logs a cache miss before a live PR fetch', async () => {
+    const cacheDir = await mkdtemp(path.join(tmpdir(), 'ditto-github-pr-cache-log-'));
+    const infoSpy = vi.spyOn(logger, 'info');
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const liveClient = new HttpGithubPrClient(cacheDir, 'test-token');
+      await liveClient.getChangedFiles('example', 'repo', 42);
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('cache miss'));
+    } finally {
+      await rm(cacheDir, { recursive: true, force: true });
+    }
   });
 
   it('resolves the latest open PR from the cached listing with NO token', async () => {
