@@ -26,6 +26,7 @@ export function ImplementationCard({
       <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <h4 className="truncate font-mono text-[13px] font-semibold text-ink">{member.name}</h4>
+          <Badge tone="neutral">{member.language === 'python' ? 'py' : 'ts'}</Badge>
           {member.isCanonical && <Badge tone="accent">Canonical</Badge>}
           {member.isPure && (
             <Badge

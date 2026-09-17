@@ -153,6 +153,7 @@ class IntelligenceService {
         body: fn.body,
         loc: fn.loc,
         isPure: fn.isPure,
+        language: fn.language ?? 'ts',
         isCanonical: fn._id.toString() === canonicalId,
       })),
       differences: cluster.differences,
