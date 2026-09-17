@@ -6,6 +6,7 @@ import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import { RepoRepository, ClusterRepository } from '../Repository/index.js';
 import { FunctionModel } from '../Models/index.js';
 import AppConfig from '../Config/AppConfig.js';
+import { fetchGithub } from '../Utils/githubFetch.js';
 
 /**
  * FEASIBILITY PROBE — would a PR-time "drift warning" have anything to say?
@@ -47,7 +48,7 @@ const gh = async <T>(url: string, cacheKey: string): Promise<T | null> => {
   };
   if (AppConfig.GITHUB_TOKEN) headers.authorization = `Bearer ${AppConfig.GITHUB_TOKEN}`;
 
-  const res = await fetch(url, { headers });
+  const res = await fetchGithub(url, { headers });
   if (!res.ok) {
     console.error(`  ! ${res.status} ${url} (remaining: ${res.headers.get('x-ratelimit-remaining')})`);
     return null;
