@@ -201,6 +201,8 @@ export type RepoStats = {
    */
   functionsAnalyzed: number;
   functionsTotal: number;
+  /** Number of clusters marked as intentional / suppressed */
+  suppressedClusters?: number;
 };
 
 /* ------------------------------------------------------------------ *
@@ -278,6 +280,9 @@ export type ClusterSummary = {
   disagreementRisk: DisagreementRisk;
   hasProvenDivergence: boolean;
   linesRemovable: number;
+  /** True if the entire cluster is marked intentional in .dittoignore */
+  isSuppressed?: boolean;
+  suppressionReason?: string;
 };
 
 export type ClusterDetail = ClusterSummary & {
@@ -352,6 +357,9 @@ export type PrFinding = {
   /** The EXECUTED divergence table when both sides pure; null otherwise. */
   divergence: DivergenceTable | null;
   proof: 'executed' | 'suspected' | 'none';
+  /** True when marked as an intentional duplicate via .dittoignore suppression */
+  suppressed?: boolean;
+  suppressionReason?: string;
 };
 
 /** A finished per-PR analysis — self-contained, keyed for dedup by headSha. */

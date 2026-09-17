@@ -95,6 +95,8 @@ const prFindingSchema = new mongoose.Schema<PrFinding>(
     usedBy: { type: [String], default: [] },
     divergence: { type: divergenceSchema, default: null },
     proof: { type: String, enum: ['executed', 'suspected', 'none'], required: true },
+    suppressed: { type: Boolean, default: false },
+    suppressionReason: { type: String },
   },
   { _id: false }
 );
