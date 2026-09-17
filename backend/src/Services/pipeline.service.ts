@@ -24,6 +24,12 @@ import {
   type StageReporter,
 } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
+import {
+  createSuppressionMatcher,
+  resolveSuppressions,
+  type SuppressionMatcher,
+} from './indexer/suppression.js';
+import { parseDittoFile } from './indexer/ignore.js';
 
 /**
  * THE PIPELINE.
@@ -74,6 +80,7 @@ export interface PipelineOptions {
   candidateCap?: number;
   /** Live-progress reporter — fires at each pipeline stage boundary. */
   onStage?: StageReporter;
+  dittoIgnoreContent?: string;
 }
 
 export interface PipelineReport {
@@ -149,7 +156,15 @@ class PipelineService {
   }
 
   async run(options: PipelineOptions): Promise<PipelineReport> {
-    const { owner, name, cacheDir = DEFAULT_CACHE_DIR, maxFunctions, candidateCap, onStage } = options;
+    const {
+      owner,
+      name,
+      cacheDir = DEFAULT_CACHE_DIR,
+      maxFunctions,
+      candidateCap,
+      onStage,
+      dittoIgnoreContent,
+    } = options;
 
     // The live path supplies functions in memory; the local CLI reads the cache
     // the indexer wrote. Either way, the total is captured BEFORE any cap so the
@@ -274,14 +289,61 @@ class PipelineService {
 
     // ---- stage 5: probe (deterministic, 0 tokens) ----
     await onStage?.('probe');
+
+    let suppressionMatcher: SuppressionMatcher | undefined;
+
+    if (dittoIgnoreContent) {
+      const parsedDitto = parseDittoFile(dittoIgnoreContent);
+      const resolution = resolveSuppressions(parsedDitto.rawSuppressions, saved);
+      suppressionMatcher = createSuppressionMatcher(resolution);
+    }
+
     const limit = pLimit(PROBE_CONCURRENCY);
     const clusterDocs = await Promise.all(
       adjudicated.clusters.map((cluster) =>
         limit(async (): Promise<Partial<ICluster>> => {
-          const members = cluster.memberIds.map((id) => {
-            const doc = byId.get(id);
+          const memberDocs = cluster.memberIds
+            .map((id) => byId.get(id))
+            .filter((doc): doc is HydratedDocument<IFunction> => Boolean(doc));
+
+          // Identify the canonical implementation chosen by flagship model
+          const canonicalDoc = byId.get(cluster.canonicalId);
+
+          let isClusterSuppressed = false;
+          let suppressionReason: string | undefined;
+
+          // Case A: 2-member cluster (the standard pairwise duplicate A <-> B)
+          if (memberDocs.length === 2) {
+            const suppression = suppressionMatcher?.getSuppression(
+              memberDocs[0].bodyHash,
+              memberDocs[1].bodyHash
+            );
+            if (suppression) {
+              isClusterSuppressed = true;
+              suppressionReason = suppressionReason;
+            }
+          } else if (canonicalDoc) {
+            // Case B: Multi-member cluster (>= 3 functions)
+            // A cluster is considered suppressed if every non-canonical member
+            // has been intentionally paired with the canonical implementation
+            const nonCannonicals = memberDocs.filter(
+              (member) => member._id.toString() !== canonicalDoc._id.toString()
+            );
+            const allSuppressed = nonCannonicals.every((member) =>
+              suppressionMatcher?.isPairSuppressed(canonicalDoc.bodyHash, member.bodyHash)
+            );
+            if (allSuppressed && nonCannonicals.length > 0) {
+              isClusterSuppressed = true;
+              suppressionReason = suppressionMatcher?.getSuppression(
+                canonicalDoc.bodyHash,
+                nonCannonicals[0].bodyHash
+              )?.reason;
+            }
+          }
+
+          const members = memberDocs.map((doc) => {
             return {
-              id,
+              id: doc._id.toString(),
               body: doc?.body ?? '',
               isPure: doc?.isPure ?? false,
               language: (doc?.language as 'ts' | 'python' | undefined) ?? 'ts',
@@ -303,6 +365,8 @@ class PipelineService {
             cohesion: cohesionByKey.get(clusterKey(cluster.memberIds)) ?? 0,
             probeInputs: cluster.probeInputs,
             ...(divergence ? { divergence } : {}),
+            isSuppressed: isClusterSuppressed,
+            ...(suppressionReason ? { suppressionReason } : {}),
           };
         })
       )
@@ -409,6 +473,7 @@ const toStatsCluster = (doc: Partial<ICluster>): StatsCluster => ({
   canonicalId: doc.canonicalId?.toString() ?? '',
   confidence: doc.confidence ?? 0,
   disagreementRisk: doc.disagreementRisk ?? 'none',
+  isSuppressed: doc.isSuppressed ?? false,
 });
 
 export default PipelineService;

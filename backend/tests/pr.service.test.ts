@@ -154,6 +154,35 @@ describe('PrService.analyzeChangedFunctions', () => {
     expect(findings[0].divergence).toBeNull();
   });
 
+  it('marks a finding as suppressed when matched pair is configured in .dittoignore', async () => {
+    const fnPR = prFunction({ isPure: true }); // bodyHash is 'pr-body-hash' (12 chars)
+    const fnExisting = {
+      ...truncateDoc({ isPure: true }),
+      bodyHash: 'truncate-hash-123',
+    };
+
+    const dittoIgnoreContent = [
+      '[suppressions]',
+      'pr-body-hash:truncate-hash-123 # Intentional cross-boundary truncate',
+    ].join("\n");
+
+    const service = makeService({
+      existing: [fnExisting],
+      adjudicate: MATCHED_ADJUDICATION,
+    });
+
+    const findings = await service.analyzeChangedFunctions(
+      repo as never,
+      [fnPR],
+      undefined,
+      dittoIgnoreContent
+    );
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0].suppressed).toBe(true);
+    expect(findings[0].suppressionReason).toBe('Intentional cross-boundary truncate');
+  });
+
   it('refuses a stale-recipe index rather than compare across embed recipes', async () => {
     const service = makeService({
       existing: [{ ...truncateDoc({ isPure: true }), embedVersion: 'v1-old-recipe' }],

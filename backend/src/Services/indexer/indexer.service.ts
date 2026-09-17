@@ -51,6 +51,7 @@ export interface ExtractResult {
   filesScanned: number;
   skippedByReason: Record<string, number>;
   dropped: number;
+  dittoIgnoreContent?: string;
 }
 
 export interface IndexReport {
@@ -75,6 +76,7 @@ export interface CacheFile {
   scope?: string;
   indexedAt: string;
   functions: ExtractedFunction[];
+  dittoIgnoreContent?: string;
 }
 
 export const cacheFileFor = (owner: string, name: string, cacheDir = DEFAULT_CACHE_DIR): string =>
@@ -187,6 +189,7 @@ class IndexerService {
       filesScanned: repo.files.size,
       skippedByReason,
       dropped,
+      dittoIgnoreContent,
     };
   }
 
@@ -194,7 +197,8 @@ class IndexerService {
     const { owner, name, scope, cacheDir = DEFAULT_CACHE_DIR } = options;
 
     const extracted = await this.extract(options);
-    const { functions, commit, filesScanned, skippedByReason, dropped } = extracted;
+    const { functions, commit, filesScanned, skippedByReason, dropped, dittoIgnoreContent } =
+      extracted;
 
     const cacheFile = cacheFileFor(owner, name, cacheDir);
     const payload: CacheFile = {
@@ -204,6 +208,7 @@ class IndexerService {
       ...(scope ? { scope } : {}),
       indexedAt: new Date().toISOString(),
       functions,
+      dittoIgnoreContent,
     };
     await mkdir(path.dirname(cacheFile), { recursive: true });
     await writeFile(cacheFile, `${JSON.stringify(payload, null, 2)}\n`);

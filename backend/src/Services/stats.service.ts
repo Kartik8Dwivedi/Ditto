@@ -104,6 +104,7 @@ export interface StatsCluster {
   canonicalId: string;
   confidence: number;
   disagreementRisk: DisagreementRisk;
+  isSuppressed?: boolean;
 }
 
 /** The directory a file lives in — our unit of "module". */
@@ -149,8 +150,11 @@ export const computeRepoStats = (
   const byId = new Map(functions.map((fn) => [fn.id, fn]));
 
   const confirmed = clusters.filter(isConfirmed);
+  const activeConfirmed = confirmed.filter((c) => !c.isSuppressed);
+  const suppressedClusters = confirmed.filter((c) => c.isSuppressed).length;
+
   const nearDuplicates = clusters.length - confirmed.length;
-  const behavioralConflicts = confirmed.filter(
+  const behavioralConflicts = activeConfirmed.filter(
     (cluster) => cluster.disagreementRisk === 'semantic'
   ).length;
 
@@ -184,7 +188,7 @@ export const computeRepoStats = (
     functions: functions.length,
     files: new Set(functions.map((fn) => fn.file)).size,
     modules: new Set(functions.map((fn) => moduleOf(fn.file))).size,
-    semanticDuplicateClusters: confirmed.length,
+    semanticDuplicateClusters: activeConfirmed.length,
     behavioralConflicts,
     nearDuplicates,
     reusableUtilities,
@@ -193,11 +197,12 @@ export const computeRepoStats = (
     callSitesUnifiable,
     healthScore: healthScore({
       functions: functions.length,
-      semanticDuplicateClusters: confirmed.length,
+      semanticDuplicateClusters: activeConfirmed.length,
       behavioralConflicts,
       nearDuplicates,
     }),
     functionsAnalyzed: functions.length,
     functionsTotal: functionsTotal ?? functions.length,
+    suppressedClusters,
   };
 };

@@ -40,7 +40,12 @@ import type {
   StageReporter,
 } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
-import { createIgnoreMatcher, parseIgnorePatterns } from './indexer/ignore.js';
+import { createIgnoreMatcher, parseDittoFile, parseIgnorePatterns } from './indexer/ignore.js';
+import {
+  createSuppressionMatcher,
+  resolveSuppressions,
+  type SuppressionMatcher,
+} from './indexer/suppression.js';
 
 /**
  * PER-PR ANALYSIS — Ditto's flagship "did this PR reinvent something?" check.
@@ -395,13 +400,18 @@ class PrService {
     const rangesByFile = changedSourceRanges(files);
 
     let changedFns: ExtractedFunction[] = [];
+    let dittoIgnoreContent: string | undefined = undefined;
     if (rangesByFile.size > 0) {
       await onStage?.('parse');
-      changedFns = await this.extractChangedFunctions(repo, meta, rangesByFile);
+      const extracted = await this.extractChangedFunctions(repo, meta, rangesByFile);
+      changedFns = extracted.changedFns;
+      dittoIgnoreContent = extracted.dittoIgnoreContent;
     }
 
     const findings =
-      changedFns.length > 0 ? await this.analyzeChangedFunctions(repo, changedFns, onStage) : [];
+      changedFns.length > 0
+        ? await this.analyzeChangedFunctions(repo, changedFns, onStage, dittoIgnoreContent)
+        : [];
 
     return this.prAnalysisRepository.create({
       owner: repo.owner,
@@ -422,7 +432,7 @@ class PrService {
     repo: HydratedDocument<IRepo>,
     meta: PullMeta,
     rangesByFile: Map<string, [number, number][]>
-  ): Promise<ExtractedFunction[]> {
+  ): Promise<{ changedFns: ExtractedFunction[]; dittoIgnoreContent?: string }> {
     const wanted = new Set(rangesByFile.keys());
     // ref = head SHA so we read exactly the code the PR proposes.
     const fetched = await this.fetchRepoFiles({
@@ -452,7 +462,7 @@ class PrService {
       }
       inputs.push({ file, contents, ranges });
     }
-    return selectChangedFunctions(inputs);
+    return { changedFns: selectChangedFunctions(inputs), dittoIgnoreContent: rawDittoIgnore };
   }
 
   /**
@@ -465,7 +475,8 @@ class PrService {
   async analyzeChangedFunctions(
     repo: HydratedDocument<IRepo>,
     changedFns: ExtractedFunction[],
-    onStage?: StageReporter
+    onStage?: StageReporter,
+    dittoIgnoreContent?: string
   ): Promise<PrFinding[]> {
     const repoId = repo._id.toString();
     const existing = (await this.functionRepository.findByRepo(repoId)).filter(
@@ -516,6 +527,36 @@ class PrService {
     await onStage?.('cluster');
     await onStage?.('adjudicate');
     await onStage?.('probe');
+
+    let suppressionMatcher: SuppressionMatcher | undefined;
+    if (dittoIgnoreContent) {
+      const parsed = parseDittoFile(dittoIgnoreContent);
+      if (parsed.rawSuppressions.length > 0) {
+        const knownUniverse: ExtractedFunction[] = [
+          ...changedFns,
+          ...existing.map((doc) => ({
+            name: doc.name,
+            file: doc.file,
+            startLine: doc.startLine,
+            endLine: doc.endLine,
+            signature: doc.signature,
+            body: doc.body,
+            bodyHash: doc.bodyHash,
+            loc: doc.loc,
+            isExported: doc.isExported,
+            params: doc.params,
+            returnTypeText: doc.returnTypeText,
+            imports: doc.imports,
+            callsExternal: doc.callsExternal,
+            isPure: doc.isPure,
+            language: doc.language,
+          })),
+        ];
+
+        const resolution = resolveSuppressions(parsed.rawSuppressions, knownUniverse);
+        suppressionMatcher = createSuppressionMatcher(resolution);
+      }
+    }
 
     const findings: PrFinding[] = [];
     for (const fn of changedFns) {
@@ -603,6 +644,13 @@ class PrService {
         }
       }
 
+      const suppression = suppressionMatcher?.getSuppression(fn.bodyHash, existingDoc.bodyHash);
+      if (suppression) {
+        logger.info(
+          `PR: Intentional duplicate suppressed: ${fn.name} (${fn.file}) -> ${existingDoc.name} (${existingDoc.file}) | Reason: ${suppression.reason ?? 'N/A'}`
+        );
+      }
+
       findings.push({
         newFunction: { name: fn.name, file: fn.file, startLine: fn.startLine, endLine: fn.endLine },
         match: {
@@ -617,6 +665,8 @@ class PrService {
         usedBy,
         divergence,
         proof,
+        suppressed: Boolean(suppression),
+        ...(suppression?.reason ? { suppressionReason: suppression.reason } : {}),
       });
     }
 
