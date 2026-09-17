@@ -86,6 +86,7 @@ export const runLiveIndex = async (options: LiveIndexOptions): Promise<LiveIndex
     name,
     functions: extracted.functions,
     commit: extracted.commit,
+    dittoIgnoreContent: extracted.dittoIgnoreContent,
     candidateCap: LIVE_CANDIDATE_CAP,
     functionsTotal,
     onStage,

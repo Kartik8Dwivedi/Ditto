@@ -75,6 +75,7 @@ export const ExtractorCacheFileSchema = z.union([
     repo: z.string().optional(),
     commit: z.string().optional(),
     functions: z.array(ExtractedFunctionSchema),
+    dittoIgnoreContent: z.optional(z.string()),
   }),
 ]);
 
