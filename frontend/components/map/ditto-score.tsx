@@ -44,6 +44,11 @@ export function DittoScore({ score }: { score: number }) {
       </div>
       <div className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-inset ring-1 ring-line-strong ring-inset">
         <div
+          role="progressbar"
+          aria-label="Ditto score"
+          aria-valuenow={score}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className={cn('h-full rounded-full transition-[width] duration-[1000ms] ease-out shadow-sm', tone.bar)}
           style={{ width: `${score}%` }}
         />

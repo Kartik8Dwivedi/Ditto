@@ -22,6 +22,11 @@ export function ConfidenceMeter({
       <span className="text-[10px] tracking-wider text-ink-subtle uppercase">Confidence</span>
       <div className="relative h-1.5 w-28 overflow-hidden rounded-full bg-inset ring-1 ring-line-strong ring-inset">
         <div
+          role="progressbar"
+          aria-label="Match confidence"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className={cn(
             'h-full rounded-full transition-[width] duration-500 ease-out',
             meets ? 'bg-accent' : 'bg-ink-subtle',
