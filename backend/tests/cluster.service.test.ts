@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
+  candidatePriority,
   cosineSimilarity,
   findCandidateClusters,
   isCompatible,
@@ -23,6 +24,28 @@ const fn = (overrides: Partial<ClusterableFunction> & { id: string }): Clusterab
   inputs: ['string'],
   outputs: ['string'],
   ...overrides,
+});
+
+describe('candidatePriority', () => {
+  it.each([
+    [1, 0.985, 0],
+    [1, 0.9849, 1],
+    [2, 0.985, 2],
+    [2, 0.9849, 3],
+  ])('maps moduleCount=%i and cohesion=%f to priority %i', (moduleCount, cohesion, priority) => {
+    expect(candidatePriority({ memberIds: ['a', 'b'], moduleCount, cohesion })).toBe(priority);
+  });
+
+  it('ranks a cross-module near-duplicate above a same-module exact clone', () => {
+    const exactClone = candidatePriority({ memberIds: ['a', 'b'], moduleCount: 1, cohesion: 1 });
+    const crossModuleNearDuplicate = candidatePriority({
+      memberIds: ['c', 'd'],
+      moduleCount: 2,
+      cohesion: 0.9849,
+    });
+
+    expect(crossModuleNearDuplicate).toBeGreaterThan(exactClone);
+  });
 });
 
 describe('cosineSimilarity', () => {
