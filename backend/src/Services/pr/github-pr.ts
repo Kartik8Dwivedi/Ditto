@@ -149,9 +149,11 @@ export class HttpGithubPrClient implements GithubPrClient {
   private async get<T>(url: string, cacheKey: string): Promise<T | null> {
     const cached = await this.readCache<T>(cacheKey);
     if (cached !== null) {
+      logger.info(`github PR cache hit: ${cacheKey}`);
       return cached;
     }
 
+    logger.info(`github PR cache miss: ${cacheKey}`);
     const res = await this.fetchApi(url);
     if (!res.ok) {
       return null;
@@ -200,9 +202,11 @@ export class HttpGithubPrClient implements GithubPrClient {
     const cacheKey = `${owner}-${name}-pr-${prNumber}-files`;
     const cached = await this.readCache<PrFile[]>(cacheKey);
     if (cached !== null) {
+      logger.info(`github PR cache hit: ${cacheKey}`);
       return Object.assign(cached, { truncated: false });
     }
 
+    logger.info(`github PR cache miss: ${cacheKey}`);
     let nextUrl: string | null =
       `https://api.github.com/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`;
     const allFiles: PrFile[] = [];
