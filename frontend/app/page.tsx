@@ -149,7 +149,7 @@ export default function Home() {
         </section>
 
         {/* The AI Slop Problem Section */}
-        <section id="why-ditto" className="rounded-2xl border border-line bg-panel p-6 md:p-8 space-y-6 relative overflow-hidden">
+        <section id="why-ditto" className="scroll-mt-20 rounded-2xl border border-line bg-panel p-6 md:p-8 space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 -z-10 h-32 w-32 rounded-full bg-warn/4 blur-[24px] pointer-events-none" />
           
           <div className="flex flex-col md:flex-row gap-6 md:gap-10">
@@ -181,7 +181,7 @@ export default function Home() {
         </section>
 
         {/* How it Works / Architecture */}
-        <section id="how-it-works" className="space-y-6">
+        <section id="how-it-works" className="scroll-mt-20 space-y-6">
           <div className="flex items-center gap-2 border-b border-line pb-2">
             <Layers className="size-4 text-ink-subtle" />
             <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
@@ -260,7 +260,7 @@ export default function Home() {
         </section>
 
         {/* Compare Table */}
-        <section id="compare" className="space-y-6">
+        <section id="compare" className="scroll-mt-20 space-y-6">
           <div className="flex items-center gap-2 border-b border-line pb-2">
             <GitPullRequest className="size-4 text-ink-subtle" />
             <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
@@ -318,7 +318,7 @@ export default function Home() {
         </section>
 
         {/* Roadmap / Future section */}
-        <section id="roadmap" className="space-y-6">
+        <section id="roadmap" className="scroll-mt-20 space-y-6">
           <div className="flex items-center gap-2 border-b border-line pb-2">
             <Milestone className="size-4 text-ink-subtle" />
             <h2 className="font-mono text-[11px] font-semibold tracking-[0.16em] text-ink-subtle uppercase">
