@@ -22,6 +22,8 @@ export interface IPrAnalysis {
   prUrl: string;
   /** Count kept after the diff-range filter. */
   changedFunctions: number;
+  /** Whether changed-file collection stopped at the configured page cap. */
+  filesTruncated: boolean;
   /** One finding per changed function, embedded inline. */
   findings: PrFinding[];
   createdAt: Date;
@@ -106,6 +108,7 @@ const prAnalysisSchema = new mongoose.Schema<IPrAnalysis>(
     baseSha: { type: String, required: true },
     prUrl: { type: String, required: true },
     changedFunctions: { type: Number, default: 0 },
+    filesTruncated: { type: Boolean, default: false },
     findings: { type: [prFindingSchema], default: [] },
   },
   {

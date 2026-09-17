@@ -312,7 +312,7 @@ describe('PrService.analyze with .dittoignore', () => {
   };
 
   it('skips changed files matching .dittoignore fetched at head SHA', async () => {
-    const mockChangedFiles = [
+    const mockChangedFiles = Object.assign([
       {
         filename: 'vendor/shim.ts',
         status: 'added',
@@ -323,7 +323,7 @@ describe('PrService.analyze with .dittoignore', () => {
         status: 'added',
         patch: '@@ -0,0 +1,3 @@\n+export function app() {\n+  return 2;\n+}',
       },
-    ];
+    ], { truncated: true });
 
     const mockFetchRepoFiles = vi.fn().mockResolvedValue({
       files: new Map([
@@ -362,5 +362,6 @@ describe('PrService.analyze with .dittoignore', () => {
     expect(passedFunctions[0].file).toBe('src/app.ts');
 
     expect(result.changedFunctions).toBe(1);
+    expect(result.filesTruncated).toBe(true);
   });
 });

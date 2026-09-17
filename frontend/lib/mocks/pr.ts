@@ -46,6 +46,7 @@ export const MOCK_PR_ANALYSIS: PrAnalysis = {
   baseSha: '4f1c9ab00112233445566778899aabbccddeeff0',
   prUrl: 'https://github.com/cline/cline/pull/4821',
   changedFunctions: 3,
+  filesTruncated: false,
   createdAt: '2026-08-06T10:15:00.000Z',
   findings: [
     /* 1 ── EXECUTED. Reinvents truncateText, proven to disagree. */
