@@ -1,4 +1,5 @@
 import type { DisagreementRisk, RepoStats } from '../Models/index.js';
+import AppConfig from '../Config/AppConfig.js';
 
 /**
  * Repo scoring — pure functions, no LLM, no database.
@@ -14,7 +15,7 @@ import type { DisagreementRisk, RepoStats } from '../Models/index.js';
  * a "near-duplicate" — shown, but as a suggestion, never as a finding. Precision
  * is the residual risk of this product; this constant is how we manage it.
  */
-export const CONFIDENCE_THRESHOLD = 0.75;
+export const CONFIDENCE_THRESHOLD = AppConfig.CONFIDENCE_THRESHOLD;
 
 /**
  * Weighted cost of each kind of debt, in arbitrary "penalty units".

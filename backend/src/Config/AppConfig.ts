@@ -56,6 +56,7 @@ const envSchema = z.object({
    * These bound the LIVE path only. The offline CLI pipeline is unaffected and
    * keeps its full-run behaviour.
    */
+  CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.75),
   LIVE_MAX_FUNCTIONS: z.coerce.number().int().positive().default(2000),
   LIVE_CANDIDATE_CAP: z.coerce.number().int().positive().default(100),
   /**
@@ -113,6 +114,7 @@ const AppConfig = Object.freeze({
   TASKS_QUEUE: env.TASKS_QUEUE,
   SERVICE_URL: env.SERVICE_URL,
   TASK_SECRET: env.TASK_SECRET,
+  CONFIDENCE_THRESHOLD: env.CONFIDENCE_THRESHOLD,
   LIVE_MAX_FUNCTIONS: env.LIVE_MAX_FUNCTIONS,
   LIVE_CANDIDATE_CAP: env.LIVE_CANDIDATE_CAP,
   LIVE_DEADLINE_MS: env.LIVE_DEADLINE_MS,
