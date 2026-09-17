@@ -188,7 +188,7 @@ export const computeRepoStats = (
     functions: functions.length,
     files: new Set(functions.map((fn) => fn.file)).size,
     modules: new Set(functions.map((fn) => moduleOf(fn.file))).size,
-    semanticDuplicateClusters: confirmed.length,
+    semanticDuplicateClusters: activeConfirmed.length,
     behavioralConflicts,
     nearDuplicates,
     reusableUtilities,
