@@ -152,9 +152,10 @@ export const fetchRepoFiles = async ({
       }
 
       const chunks: Buffer[] = [];
-      stream.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-        totalBytes += chunk.length;
+      stream.on('data', (chunk: unknown) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array | string);
+        chunks.push(buf);
+        totalBytes += buf.length;
         if (totalBytes > MAX_TOTAL_BYTES) reject(new Error('tarball exceeded the size guard'));
       });
       stream.on('end', () => {
