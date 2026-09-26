@@ -5,6 +5,7 @@ import unittest
 from src.Services.probe.languages.python.harness import (
     UnserializableValueError,
     canonical_serialise,
+    extract_and_prepare_candidate,
     invoke_candidate,
 )
 
@@ -246,6 +247,93 @@ class TestDeterminism(unittest.TestCase):
         val1 = {"x": 1, "y": 2, "z": 3}
         val2 = {"z": 3, "x": 1, "y": 2}
         self.assertEqual(canonical_serialise(val1), canonical_serialise(val2))
+
+
+class TestExtractAndPrepareCandidate(unittest.TestCase):
+    def test_extract_standard_function(self):
+        scope = {}
+        body = "def add(a, b):\n    return a + b"
+        fn = extract_and_prepare_candidate(body, None, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(2, 3), 5)
+        self.assertIn("add", scope)
+
+    def test_extract_function_with_inner_helper_does_not_confuse_target(self):
+        scope = {}
+        body = (
+            "def compute(x):\n"
+            "    def inner_helper(y):\n"
+            "        return y * 2\n"
+            "    return inner_helper(x) + 1"
+        )
+        fn = extract_and_prepare_candidate(body, None, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(5), 11)
+        self.assertEqual(fn.__name__, "compute")
+
+    def test_extract_function_with_preamble_dependencies(self):
+        scope = {}
+        preamble = (
+            "OFFSET = 100\n"
+            "def helper(v):\n"
+            "    return v + OFFSET\n"
+        )
+        body = "def run(x):\n    return helper(x)"
+        fn = extract_and_prepare_candidate(body, preamble, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(5), 105)
+        self.assertEqual(fn.__name__, "run")
+
+    def test_extract_function_preamble_failure_is_non_fatal(self):
+        scope = {}
+        bad_preamble = "raise RuntimeError('preamble failed')"
+        body = "def independent(x):\n    return x * 10"
+        fn = extract_and_prepare_candidate(body, bad_preamble, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(3), 30)
+
+    def test_extract_decorated_function(self):
+        scope = {}
+        preamble = (
+            "def double_result(func):\n"
+            "    def wrapper(*args, **kwargs):\n"
+            "        return func(*args, **kwargs) * 2\n"
+            "    return wrapper\n"
+        )
+        body = (
+            "@double_result\n"
+            "def triple(x):\n"
+            "    return x * 3"
+        )
+        fn = extract_and_prepare_candidate(body, preamble, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(4), 24)
+
+    def test_extract_lambda_assignment(self):
+        scope = {}
+        body = "square = lambda x: x * x"
+        fn = extract_and_prepare_candidate(body, None, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(6), 36)
+
+    def test_extract_anonymous_lambda(self):
+        scope = {}
+        body = "lambda a, b: a * b + 1"
+        fn = extract_and_prepare_candidate(body, None, scope)
+        self.assertTrue(callable(fn))
+        self.assertEqual(fn(3, 4), 13)
+
+    def test_extract_no_callable_raises_value_error(self):
+        scope = {}
+        body = "x = 42"
+        with self.assertRaises(ValueError):
+            extract_and_prepare_candidate(body, None, scope)
+
+    def test_extract_syntax_error_in_body_raises(self):
+        scope = {}
+        body = "def broken(:"
+        with self.assertRaises(SyntaxError):
+            extract_and_prepare_candidate(body, None, scope)
 
 
 if __name__ == "__main__":

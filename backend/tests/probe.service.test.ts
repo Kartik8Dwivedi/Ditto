@@ -97,17 +97,20 @@ describe('ProbeService.probe — real execution', () => {
     expect(table).toBeUndefined();
   });
 
-  it('NEVER executes pure Python members (honesty rail — issue #27)', async () => {
+  it('executes pure Python members in the Pyodide sandbox', async () => {
     const table = await new ProbeService().probe(
       [
-        { id: 'py-add', body: 'function py_add(a, b) { return a + b; }', isPure: true, language: 'python' },
-        { id: 'py-sum', body: 'function py_sum(a, b) { return a + b; }', isPure: true, language: 'python' },
+        { id: 'py-add', body: 'def py_add(a, b):\n    return a + b', isPure: true, language: 'python' },
+        { id: 'py-sum', body: 'def py_sum(a, b):\n    return b + a', isPure: true, language: 'python' },
       ],
       ['[1, 2]']
     );
-
-    expect(table).toBeUndefined();
-  });
+  
+    expect(table).toBeDefined();
+    expect(table?.executed).toBe(true);
+    expect(table?.rows).toHaveLength(1);
+    expect(table?.rows[0].diverged).toBe(false);
+  }, 15000);
 
 
   it('will not run a cluster with only one pure member', async () => {
