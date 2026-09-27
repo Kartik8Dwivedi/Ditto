@@ -244,10 +244,10 @@ Use the helper CLI to add or audit suppressions without calculating hashes manua
 
 ```bash
 # Add a suppression rule for two functions (uses shortest unambiguous prefix)
-npm run suppress add src/utils.ts:formatDate src/legacy.ts:formatDate -- --reason "Intentional legacy format mirror"
+npm run suppress -- add src/utils.ts:formatDate src/legacy.ts:formatDate --reason "Intentional legacy format mirror"
 
 # Audit active, stale, or ambiguous suppressions against the current codebase
-npm run suppress check
+npm run suppress -- check
 ```
 
 ### 2. Configure the backend
