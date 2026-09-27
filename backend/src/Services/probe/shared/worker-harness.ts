@@ -20,7 +20,7 @@ export function executeSandboxedWorker(opts: ExecuteWorkerOptions): Promise<Work
   // Still capped at MAX_WORKER_MS so a huge cluster can't hang forever.
   const budget = Math.min(
     MAX_WORKER_MS,
-    PROBE_TIMEOUT_MS * opts.memberCount * opts.inputCount + 10000
+    PROBE_TIMEOUT_MS * opts.memberCount * opts.inputCount + 6000
   );
 
   return new Promise<WorkerResult>((resolve, reject) => {
