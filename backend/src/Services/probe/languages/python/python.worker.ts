@@ -6,6 +6,7 @@ import type { ProbeCell, WorkerResult } from '../../contracts.js';
 interface PythonWorkerData {
   /** The harness.py source code as a string (injected into Pyodide globals). */
   harnessSource: string;
+  timeoutMs: number,
   members: Array<{ id: string; body: string; preamble?: string }>;
   inputs: string[];
   /** Maximum characters to display before truncating and hashing output. */
@@ -38,11 +39,7 @@ async function run(): Promise<void> {
     try {
       const memberScope = pyodide.toPy({});
 
-      const targetFn = extractCandidate(
-        member.body,
-        member.preamble ?? null,
-        memberScope,
-      );
+      const targetFn = extractCandidate(member.body, member.preamble ?? null, memberScope);
 
       if (!targetFn || (typeof targetFn !== 'function' && typeof targetFn.call !== 'function')) {
         unusable.push({
@@ -80,7 +77,8 @@ async function run(): Promise<void> {
           const full: string = result.value;
           const isLong = full.length > data.maxDisplayChars;
           // Long outputs: store SHA-256 hash as key, truncate display.
-          key = 'return:' + (isLong ? crypto.createHash('sha256').update(full).digest('hex') : full);
+          key =
+            'return:' + (isLong ? crypto.createHash('sha256').update(full).digest('hex') : full);
           output = isLong ? full.slice(0, data.maxDisplayChars) + '...' : full;
         } else {
           error = `${result.name}: ${result.message}`;
@@ -94,7 +92,7 @@ async function run(): Promise<void> {
           String(err?.message || err).includes('KeyboardInterrupt');
 
         if (isInterrupt) {
-          error = 'Timeout: exceeded 1000ms';
+          error = `Timeout: exceeded ${data.timeoutMs}ms`;
           key = 'throw:Timeout';
         } else {
           const name = err instanceof Error ? err.name : 'Error';

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
   MAX_DISPLAY_CHARS,
+  PROBE_TIMEOUT_MS,
   type LanguageProbeRunner,
   type ProbeMember,
   type WorkerResult,
@@ -28,6 +29,7 @@ export class PythonProbeRunner implements LanguageProbeRunner {
       workerPath,
       workerData: {
         harnessSource,
+        timeoutMs: PROBE_TIMEOUT_MS,
         members: members.map((m) => ({
           id: m.id,
           body: m.body,
