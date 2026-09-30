@@ -7,7 +7,11 @@ from typing import Any, Callable, Set
 
 
 _CIRCULAR_MARKER = "[Circular]"
-
+_DANGEROUS_BUILTINS = {"open", "__import__", "eval", "exec", "compile", "input", "breakpoint"}
+_SAFE_BUILTINS = {
+    k: v for k, v in (__builtins__ if isinstance(__builtins__, dict) else __builtins__.__dict__).items()
+    if k not in _DANGEROUS_BUILTINS
+}
 
 class UnserializableValueError(Exception):
     """Raised when a value cannot be deterministically serialized."""
@@ -45,7 +49,12 @@ def _to_canonical(val: Any, seen: Set[int]) -> Any:
 
     try:
         if isinstance(val, dict):
-            return {k: _to_canonical(v, seen) for k, v in sorted(val.items())}
+            # JSON keys must be strings: {1: 'a'} and {'1': 'a'} both serialize to {"1": "a"}.
+            # Accepted trade-off: wrapping keys with type metadata is overkill for probe clustering.
+            return {
+                _to_canonical(k, seen): _to_canonical(v, seen)
+                for k, v in sorted(val.items(), key=lambda item: repr(item[0]))
+            }
 
         if isinstance(val, (list, tuple, set, frozenset)):
             items = [_to_canonical(item, seen) for item in val]
@@ -57,6 +66,10 @@ def _to_canonical(val: Any, seen: Set[int]) -> Any:
             return items
 
         if hasattr(val, "__class__") and val.__class__.__name__ not in ("type", "function"):
+            if type(val).__repr__ is object.__repr__:
+                raise UnserializableValueError(
+                    f"Cannot serialize instance of '{val.__class__.__name__}' with default address-based repr"
+                )
             return {"$type": "object", "class": val.__class__.__name__, "repr": repr(val)}
 
         raise UnserializableValueError(
@@ -112,13 +125,14 @@ def extract_and_prepare_candidate(
     Uses Python's ast module to inspect the member body statically, ensuring
     inner helper functions or imports do not shadow the main candidate.
     """
+    if "__builtins__" not in scope:
+            scope["__builtins__"] = _SAFE_BUILTINS.copy()
+        
     if preamble_source:
         try:
             exec(preamble_source, scope)
-        except Exception:
-            # Preamble evaluation failure is non-fatal:
-            # function might not need it or can fail later at invocation.
-            pass
+        except Exception as e:
+            raise RuntimeError(f"Preamble evaluation failed: {type(e).__name__}: {e}") from e
 
     tree = ast.parse(body_source)
 
@@ -126,7 +140,7 @@ def extract_and_prepare_candidate(
 
     # 1. Standard function definition at the top level of the body
     for node in tree.body:
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             target_name = node.name
             break
         if isinstance(node, ast.Assign):

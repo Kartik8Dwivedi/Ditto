@@ -1,6 +1,6 @@
 import json
-import math
 import unittest
+from dataclasses import dataclass
 
 from src.Services.probe.languages.python.harness import (
     UnserializableValueError,
@@ -17,6 +17,14 @@ class Point:
 
     def __repr__(self):
         return f"Point(x={self.x}, y={self.y})"
+
+class MoneyNoRepr:
+    def __init__(self, amount: int):
+        self.amount = amount
+
+@dataclass
+class MoneyDataclass:
+    amount: int
 
 
 class TestPrimitives(unittest.TestCase):
@@ -124,12 +132,28 @@ class TestCustomObjects(unittest.TestCase):
         self.assertEqual(parsed[0]["$type"], "object")
         self.assertEqual(parsed[0]["class"], "Point")
 
+    def test_custom_repr_serialises(self):
+        pt = Point(1, 2)
+        res = canonical_serialise(pt)
+        self.assertEqual(res, '{"$type":"object","class":"Point","repr":"Point(x=1, y=2)"}')
+
+    def test_dataclass_repr_serialises(self):
+        m = MoneyDataclass(50)
+        res = canonical_serialise(m)
+        self.assertIn('"class":"MoneyDataclass"', res)
+        self.assertIn('"repr":"MoneyDataclass(amount=50)"', res)
+
+    def test_default_repr_raises_unserializable(self):
+        m = MoneyNoRepr(100)
+        with self.assertRaises(UnserializableValueError):
+            canonical_serialise(m)
+
 
 class TestCircularReferences(unittest.TestCase):
     def test_circular_list_does_not_raise(self):
         lst = []
         lst.append(lst)
-        result = canonical_serialise(lst) 
+        result = canonical_serialise(lst)
         self.assertEqual(result, '["[Circular]"]')
 
     def test_circular_dict_does_not_raise(self):
@@ -205,7 +229,7 @@ class TestInvokeCandidateErrors(unittest.TestCase):
         def needs_two(a, b):
             return a + b
 
-        raw = invoke_candidate(needs_two, "[1]")  
+        raw = invoke_candidate(needs_two, "[1]")
         parsed = json.loads(raw)
         self.assertFalse(parsed["ok"])
         self.assertEqual(parsed["name"], "TypeError")
@@ -248,6 +272,14 @@ class TestDeterminism(unittest.TestCase):
         val2 = {"z": 3, "x": 1, "y": 2}
         self.assertEqual(canonical_serialise(val1), canonical_serialise(val2))
 
+    def test_two_instances_without_repr_raise_unserializable(self):
+        a = MoneyNoRepr(42)
+        b = MoneyNoRepr(42)
+        with self.assertRaises(UnserializableValueError):
+            canonical_serialise(a)
+        with self.assertRaises(UnserializableValueError):
+               canonical_serialise(b)
+
 
 class TestExtractAndPrepareCandidate(unittest.TestCase):
     def test_extract_standard_function(self):
@@ -284,13 +316,13 @@ class TestExtractAndPrepareCandidate(unittest.TestCase):
         self.assertEqual(fn(5), 105)
         self.assertEqual(fn.__name__, "run")
 
-    def test_extract_function_preamble_failure_is_non_fatal(self):
+    def test_extract_function_preamble_failure_is_fatal(self):
         scope = {}
         bad_preamble = "raise RuntimeError('preamble failed')"
         body = "def independent(x):\n    return x * 10"
-        fn = extract_and_prepare_candidate(body, bad_preamble, scope)
-        self.assertTrue(callable(fn))
-        self.assertEqual(fn(3), 30)
+        with self.assertRaises(RuntimeError) as ctx:
+            extract_and_prepare_candidate(body, bad_preamble, scope)
+        self.assertIn("Preamble evaluation failed", str(ctx.exception))
 
     def test_extract_decorated_function(self):
         scope = {}
@@ -334,6 +366,21 @@ class TestExtractAndPrepareCandidate(unittest.TestCase):
         body = "def broken(:"
         with self.assertRaises(SyntaxError):
             extract_and_prepare_candidate(body, None, scope)
+
+    def test_candidate_cannot_access_dangerous_builtins(self):
+        dangerous_builtins = ["open", "__import__", "eval", "exec", "compile", "input", "breakpoint"]
+        
+        for builtin_name in dangerous_builtins:
+            with self.subTest(builtin=builtin_name):
+                scope = {}
+                body = f"def exploit():\n    return {builtin_name}"
+                fn = extract_and_prepare_candidate(body, None, scope)
+                raw = invoke_candidate(fn, "[]")
+                result = json.loads(raw)
+        
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["name"], "NameError")
+                self.assertIn(f"name '{builtin_name}' is not defined", result["message"])
 
 
 if __name__ == "__main__":

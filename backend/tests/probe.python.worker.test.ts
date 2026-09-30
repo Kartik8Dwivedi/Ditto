@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { PythonProbeRunner } from '../src/Services/probe/languages/python/python.runner.js';
 import type { ProbeMember } from '../src/Services/probe/contracts.js';
+import { resolveProbeFile } from '../src/Services/probe/shared/worker-paths.js';
+import { existsSync } from 'node:fs';
 
 describe('python.worker.ts via PythonProbeRunner', { timeout: 30_000 }, () => {
   const runner = new PythonProbeRunner();
@@ -189,5 +191,13 @@ def loop_forever(x):
     expect(cell.key.startsWith('return:')).toBe(true);
     // sha256 hex is 64 chars -> 'return:' (7 chars) + 64 chars = 71 chars
     expect(cell.key.length).toBe(71);
+  });
+});
+
+
+describe('Python Harness Distribution Asset', () => {
+  it('should assert that resolved harness.py exists in the filesystem', () => {
+    const harnessPath = resolveProbeFile(import.meta.url, '../src/Services/probe/languages/python/harness.py');
+    expect(existsSync(harnessPath)).toBe(true);
   });
 });

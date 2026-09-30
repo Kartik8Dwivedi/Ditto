@@ -1,12 +1,14 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { loadPyodide } from 'pyodide';
 import type { ProbeCell, WorkerResult } from '../../contracts.js';
 
 interface PythonWorkerData {
   /** The harness.py source code as a string (injected into Pyodide globals). */
   harnessSource: string;
-  timeoutMs: number,
+  timeoutMs: number;
   members: Array<{ id: string; body: string; preamble?: string }>;
   inputs: string[];
   /** Maximum characters to display before truncating and hashing output. */
@@ -22,7 +24,12 @@ interface PythonWorkerData {
 const data = workerData as PythonWorkerData;
 
 async function run(): Promise<void> {
-  const pyodide = await loadPyodide();
+  const pyodidePackageJson = import.meta.resolve('pyodide/package.json');
+  const pyodideDir = dirname(fileURLToPath(pyodidePackageJson));
+
+  const pyodide = await loadPyodide({
+    indexURL: pyodideDir,
+  });
 
   // Configure the interrupt buffer for per-call timeout.
   pyodide.setInterruptBuffer(data.interruptBuffer);
@@ -65,6 +72,7 @@ async function run(): Promise<void> {
       let error = '';
       let key = '';
 
+      Atomics.store(data.interruptBuffer, 0, 0);
       // Signal main thread to arm the 1000ms interrupt timer in parallel.
       parentPort?.postMessage({ type: 'call_start' });
 

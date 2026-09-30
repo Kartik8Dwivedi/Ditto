@@ -370,11 +370,11 @@ class ProbeService {
   async probe(members: ProbeMember[], probeInputs: string[]): Promise<DivergenceTable | undefined> {
     // THE GATE. Impure functions have database calls, network, and dependencies:
     // executing them is both meaningless and a security hole.
-    const pure = members.filter((member) => member.isPure && (member.language ?? 'ts') === 'ts');
+    const pureTs = members.filter((member) => member.isPure && (member.language ?? 'ts') === 'ts');
     const purePy = members.filter((m) => m.isPure && m.language === 'python');
-    if (pure.length < 2 && purePy.length < 2) {
+    if (pureTs.length < 2 && purePy.length < 2) {
       logger.info(
-        `probe skipped: ${pure.length} pure TS and ${purePy.length} pure Python members, need at least 2 of either`
+        `probe skipped: ${pureTs.length} pure TS and ${purePy.length} pure Python members, need at least 2 of either`
       );
       return undefined;
     }
@@ -384,12 +384,27 @@ class ProbeService {
     }
 
     let result: WorkerResult;
+    const skippedMembers: Array<{ functionId: string; reason: string }> = [];
     try {
-      if (purePy.length >= 2) {
+      // Mixed-language dispatch policy (cross-language probing is deferred to #105):
+      // The majority language wins. In the event of a tie (e.g. 2 Python + 2 TS),
+      // TypeScript is prioritized as the primary host language.
+      // Members belonging to the unselected language cannot execute in the chosen
+      // sandbox and are routed to `unusable` so they are visibly reported rather
+      // than silently dropped.
+      const runPython = purePy.length >= 2 && purePy.length > pureTs.length;
+      if (runPython) {
+        for (const m of pureTs) {
+          skippedMembers.push({ functionId: m.id, reason: 'skipped: cluster probed as python' });
+        }
         result = await this.pyRunner.run(purePy, probeInputs);
       } else {
-        result = await this.runWorker(pure, probeInputs);
+        for (const m of purePy) {
+          skippedMembers.push({ functionId: m.id, reason: 'skipped: cluster probed as typescript' });
+        }
+        result = await this.runWorker(pureTs, probeInputs);
       }
+      result.unusable.push(...skippedMembers);
     } catch (err) {
       logger.warn('probe sandbox failed — no divergence table:', err instanceof Error ? err.message : err);
       return undefined;

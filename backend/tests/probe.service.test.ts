@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import logger from '../src/Config/logger.js'
 
 import ProbeService, {
   buildRows,
@@ -285,6 +286,38 @@ describe('ProbeService.probe — real execution', () => {
     expect(outputs).toContain('null');
     expect(table!.rows[0].diverged).toBe(true);
   });
+  
+  it('probes majority language and reports dropped members in a mixed cluster (2 Python + 2 TS)', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    const table = await new ProbeService().probe(
+      [
+        { id: 'ts-1', body: 'function a(x) { return x + 1; }', isPure: true, language: 'ts' },
+        { id: 'ts-2', body: 'function b(x) { return x + 1; }', isPure: true, language: 'ts' },
+        { id: 'py-1', body: 'def py1(x):\n    return x + 1', isPure: true, language: 'python' },
+        { id: 'py-2', body: 'def py2(x):\n    return x + 1', isPure: true, language: 'python' },
+      ],
+      ['[5]']
+    );
+
+    expect(table).toBeDefined();
+    expect(table!.executed).toBe(true);
+
+    // TypeScript is chosen on tie (2 vs 2): only TS members are in the output table
+    const executedIds = table!.rows[0].results.map((r) => r.functionId);
+    expect(executedIds.sort()).toEqual(['ts-1', 'ts-2']);
+
+    // Assert that the dropped Python members are reported as unusable rather than silently dropped
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('probe could not materialise py-1: skipped: cluster probed as typescript')
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('probe could not materialise py-2: skipped: cluster probed as typescript')
+    );
+
+    warnSpy.mockRestore();
+  });
+
 });
 
 describe('buildRows', () => {
