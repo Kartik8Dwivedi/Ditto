@@ -23,6 +23,31 @@ soft_exit() { # $1 = message
   [[ "$FAIL_ON" == "none" ]] && exit 0 || { echo "::error::$1"; exit 1; }
 }
 
+# --- validate inputs before the event-payload check ---
+case "$FAIL_ON" in
+  none|duplicate|proven-divergence) ;; # valid
+  *)
+    echo "::error::Invalid fail-on '${FAIL_ON}'. Expected one of: none, duplicate, proven-divergence."
+    exit 1
+    ;;
+esac
+
+if [[ ! "$TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT" -eq 0 ]]; then
+  echo "::error::Invalid timeout '${TIMEOUT}'. Expected a positive integer (seconds)."
+  exit 1
+fi
+
+case "$COMMENT" in
+  true|false) ;; # valid
+  *)
+    echo "::error::Invalid comment '${COMMENT}'. Expected true or false."
+    exit 1
+    ;;
+esac
+
+# Default INPUT_GITHUB_TOKEN so standalone runs don't die on unbound variable
+GH_TOKEN_VALUE="${INPUT_GITHUB_TOKEN:-}"
+
 # --- resolve the PR from the event payload ---
 event="${GITHUB_EVENT_PATH:-}"
 if [[ -z "$event" || ! -f "$event" ]]; then
@@ -132,16 +157,16 @@ report="$(mktemp)"
 cat "$report" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
 if [[ "$COMMENT" == "true" ]]; then
   comment_id=""
-  if comments_json="$(GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh api "repos/${owner}/${name}/issues/${pr_number}/comments" --paginate 2>/dev/null)"; then
+  if comments_json="$(GH_TOKEN="${GH_TOKEN_VALUE}" gh api "repos/${owner}/${name}/issues/${pr_number}/comments" --paginate 2>/dev/null)"; then
     comment_id="$(jq -s -r --arg marker "$MARKER" '[.[][] | select(.body != null and (.body | contains($marker)))] | last | .id // empty' <<<"$comments_json")"
   fi
 
   if [[ -n "$comment_id" ]]; then
-    GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh api --method PATCH "repos/${owner}/${name}/issues/comments/${comment_id}" \
+    GH_TOKEN="${GH_TOKEN_VALUE}" gh api --method PATCH "repos/${owner}/${name}/issues/comments/${comment_id}" \
       -F "body=@${report}" >/dev/null \
       || echo "::warning::Could not update PR comment — ensure the workflow grants 'pull-requests: write'."
   elif [[ "$total_dupe_count" -gt 0 ]]; then
-    GH_TOKEN="${INPUT_GITHUB_TOKEN}" gh pr comment "$pr_number" --repo "${owner}/${name}" --body-file "$report" \
+    GH_TOKEN="${GH_TOKEN_VALUE}" gh pr comment "$pr_number" --repo "${owner}/${name}" --body-file "$report" \
       || echo "::warning::Could not post PR comment — ensure the workflow grants 'pull-requests: write'."
   fi
 fi
