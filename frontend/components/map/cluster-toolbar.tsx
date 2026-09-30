@@ -57,6 +57,7 @@ export function ClusterToolbar({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Filter by domain or behaviour..."
+              aria-label="Filter clusters by domain or behaviour"
               className="w-full rounded-md border border-line bg-inset py-1.5 pl-8 pr-7 text-[12px] text-ink placeholder:text-ink-subtle focus:border-line-strong focus:outline-none"
             />
             {search && (
@@ -75,6 +76,7 @@ export function ClusterToolbar({
           <button
             type="button"
             onClick={onProvenOnlyToggle}
+            aria-pressed={provenOnly}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors',
               provenOnly
@@ -93,6 +95,7 @@ export function ClusterToolbar({
           <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
             <span className="font-mono text-[10px] tracking-wider text-ink-subtle uppercase">Sort</span>
             <select
+              aria-label="Sort clusters by"
               value={sortBy}
               onChange={(e) => onSortByChange(e.target.value as SortOption)}
               className="rounded-md border border-line bg-inset px-2 py-1 text-[11px] text-ink focus:border-line-strong focus:outline-none"
@@ -103,14 +106,18 @@ export function ClusterToolbar({
             </select>
           </div>
 
-          <span className="font-mono text-[11px] text-ink-subtle tnum">
+          <span role="status" className="font-mono text-[11px] text-ink-subtle tnum">
             {filteredCount} of {totalCount} shown
           </span>
         </div>
       </div>
 
       
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div
+        role="group"
+        aria-label="Verdict filter"
+        className="flex flex-wrap items-center gap-1.5"
+      >
         <span className="mr-1 font-mono text-[10px] tracking-wider text-ink-subtle uppercase">Verdict:</span>
         {VERDICT_OPTIONS.map((option) => {
           const isSelected = selectedVerdict === option.value;
@@ -119,6 +126,7 @@ export function ClusterToolbar({
               key={option.value}
               type="button"
               onClick={() => onVerdictChange(option.value)}
+              aria-pressed={isSelected}
               className={cn(
                 'rounded border px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider uppercase transition-colors',
                 isSelected
