@@ -318,6 +318,18 @@ describe('ProbeService.probe — real execution', () => {
     warnSpy.mockRestore();
   });
 
+  it('does not produce a false agreement row when members return unserializable values', async () => {
+    const table = await new ProbeService().probe(
+      [
+        { id: 'fn-a', body: 'class A:\n    pass\ndef f():\n    return A()', isPure: true, language: 'python' },
+        { id: 'fn-b', body: 'class B:\n    pass\ndef f():\n    return B()', isPure: true, language: 'python' },
+      ],
+      ['[]']
+    );
+    // Both are marked unusable, so fewer than 2 members survive -> no table returned
+    expect(table).toBeUndefined();
+  });
+
 });
 
 describe('buildRows', () => {

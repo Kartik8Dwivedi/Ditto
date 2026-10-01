@@ -38,7 +38,7 @@ async function run(): Promise<void> {
 
   const cells: ProbeCell[] = [];
   const unusable: Array<{ functionId: string; reason: string }> = [];
-  const ready: Array<{ id: string; fn: any }> = [];
+  const ready: Array<{ id: string; fn: (...args: unknown[]) => unknown }> = [];
 
   const extractCandidate = pyodide.globals.get('extract_and_prepare_candidate');
 
@@ -81,6 +81,15 @@ async function run(): Promise<void> {
 
         const result = JSON.parse(rawResult);
 
+        if (result.unserializable) {
+          unusable.push({
+            functionId: entry.id,
+            reason: `Return value could not be serialized: ${result.message}`,
+          });
+          // Do not emit cells for unserializable returns to prevent false agreement
+          continue;
+        }
+
         if (result.ok) {
           const full: string = result.value;
           const isLong = full.length > data.maxDisplayChars;
@@ -92,12 +101,13 @@ async function run(): Promise<void> {
           error = `${result.name}: ${result.message}`;
           key = `throw:${result.name}`;
         }
-      } catch (err: any) {
+      } catch (err) {
         // Map KeyboardInterrupt (from interrupt buffer) to throw:Timeout
         // for semantic parity with the JS probe (vm.runInContext timeout).
+        const errObj = err as { type?: string; message?: string } | undefined;
         const isInterrupt =
-          err?.type === 'KeyboardInterrupt' ||
-          String(err?.message || err).includes('KeyboardInterrupt');
+          errObj?.type === 'KeyboardInterrupt' ||
+          String(errObj?.message || err).includes('KeyboardInterrupt');
 
         if (isInterrupt) {
           error = `Timeout: exceeded ${data.timeoutMs}ms`;

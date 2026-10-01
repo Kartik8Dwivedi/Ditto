@@ -261,6 +261,19 @@ class TestInvokeCandidateErrors(unittest.TestCase):
         self.assertTrue(parsed["ok"])
         self.assertEqual(parsed["value"], '["[Circular]"]')
 
+    def test_unserializable_return_is_marked_distinct_from_exception(self):
+        class NoRepr:
+            pass
+
+        def returns_no_repr():
+            return NoRepr()
+
+        raw = invoke_candidate(returns_no_repr, "[]")
+        parsed = json.loads(raw)
+        self.assertFalse(parsed["ok"])
+        self.assertTrue(parsed.get("unserializable", False))
+        self.assertEqual(parsed["name"], "UnserializableValueError")
+
 
 class TestDeterminism(unittest.TestCase):
     def test_same_value_serialised_twice_is_identical(self):

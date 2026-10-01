@@ -1,4 +1,3 @@
-import AppConfig from '../Config/AppConfig.js';
 import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import OpenAIService from '../Services/openai.service.js';
 import logger from '../Config/logger.js';

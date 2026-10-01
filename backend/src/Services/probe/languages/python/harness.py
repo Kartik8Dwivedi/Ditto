@@ -95,6 +95,7 @@ def invoke_candidate(fn: Callable[..., Any], args_json: str) -> str:
     Returns a JSON string:
     - Success: {"ok": true, "value": canonical_serialized_result}
     - Error: {"ok": false, "name": exception_type, "message": exception_message}
+    - UnserializableValueError: {"ok": false, unserializable: true, "name": exception_type, "message": exception_message} 
     - KeyboardInterrupt: re-raised to be mapped as throw:Timeout
       at the worker level (see python.worker.ts)
     """
@@ -105,6 +106,13 @@ def invoke_candidate(fn: Callable[..., Any], args_json: str) -> str:
         return json.dumps({"ok": True, "value": serialized})
     except KeyboardInterrupt:
         raise
+    except UnserializableValueError as e:
+        return json.dumps({
+            "ok": False,
+            "unserializable": True,
+            "name": type(e).__name__,
+            "message": str(e),
+        })
     except Exception as e:
         return json.dumps({
             "ok": False,
@@ -126,7 +134,7 @@ def extract_and_prepare_candidate(
     inner helper functions or imports do not shadow the main candidate.
     """
     if "__builtins__" not in scope:
-            scope["__builtins__"] = _SAFE_BUILTINS.copy()
+        scope["__builtins__"] = _SAFE_BUILTINS.copy()
         
     if preamble_source:
         try:

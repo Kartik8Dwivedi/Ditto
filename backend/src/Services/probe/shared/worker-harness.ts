@@ -59,7 +59,7 @@ export function executeSandboxedWorker(opts: ExecuteWorkerOptions): Promise<Work
       finish(() => reject(new Error(`The probe worker exceeded ${budget}ms`)));
     }, budget);
 
-    worker.on('message', (message: any) => {
+    worker.on('message', (message) => {
       if (message && typeof message === 'object' && 'type' in message) {
         if (message.type === 'call_start') {
           clearCallTimer();
