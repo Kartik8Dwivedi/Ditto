@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -9,13 +9,9 @@ type Theme = 'dark' | 'light';
 const STORAGE_KEY = 'ditto-theme';
 
 /**
- * The `data-theme` attribute on <html> is the source of truth, not React state —
- * the server sets it to dark, and CSS reads it. So rather than mirroring it into
- * state (which means a setState-in-effect and a cascading render), we subscribe
- * to the attribute itself and read it directly.
- *
- * Because dark is already the server-rendered default, there is no flash to
- * prevent and no pre-hydration script needed.
+ * The `data-theme` attribute on <html> is the source of truth, not React state.
+ * The root layout restores a saved theme before first paint, and this component
+ * subscribes to subsequent attribute changes without mirroring them into state.
  */
 function subscribe(onChange: () => void): () => void {
   const observer = new MutationObserver(onChange);
@@ -41,14 +37,6 @@ function applyTheme(theme: Theme) {
 
 export function ThemeToggle({ className }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  // Restores a remembered choice. This only writes to the DOM — an external
-  // system — so it does not trigger a render of its own; the observer above
-  // picks the change up.
-  useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === 'light' || saved === 'dark') applyTheme(saved);
-  }, []);
 
   const toggle = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';

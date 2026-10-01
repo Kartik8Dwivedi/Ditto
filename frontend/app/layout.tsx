@@ -14,9 +14,8 @@ export const metadata: Metadata = {
 /**
  * Stays server-rendered — client-only concerns live in components/providers.tsx.
  *
- * `data-theme="dark"` is set here rather than sniffed from the OS: dark is the
- * default and the demo mode, and it should not depend on how the machine the
- * demo is recorded on happens to be configured. The toggle flips this attribute.
+ * Light is the server-rendered fallback. A synchronous script restores a saved
+ * theme before first paint so returning users do not see the wrong theme flash.
  */
 export default function RootLayout({
   children,
@@ -27,8 +26,17 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
+      suppressHydrationWarning
       className="h-full antialiased"
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var t=localStorage.getItem("ditto-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()',
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col bg-canvas text-ink">
         <Providers>{children}</Providers>
       </body>
