@@ -345,16 +345,21 @@ export const buildRows = (cells: ProbeCell[]): DivergenceTable['rows'] => {
     else byInput.set(cell.input, [cell]);
   }
 
-  return [...byInput].map(([input, group]) => ({
-    input,
-    results: group.map((cell) => ({
-      functionId: cell.functionId,
-      output: cell.output,
-      ...(cell.error ? { error: cell.error } : {}),
-    })),
-    // Any two members disagreeing on this input is a divergence.
-    diverged: new Set(group.map((cell) => cell.key)).size > 1,
-  }));
+  return [...byInput]
+    // A group with fewer than two cells has nothing to compare — it is a data
+    // point, not an agreement. Dropping it keeps every row in the table
+    // semantically honest: "these members were compared and they agreed/disagreed".
+    .filter(([, group]) => group.length >= 2)
+    .map(([input, group]) => ({
+      input,
+      results: group.map((cell) => ({
+        functionId: cell.functionId,
+        output: cell.output,
+        ...(cell.error ? { error: cell.error } : {}),
+      })),
+      // Any two members disagreeing on this input is a divergence.
+      diverged: new Set(group.map((cell) => cell.key)).size > 1,
+    }));
 };
 
 class ProbeService {
@@ -422,7 +427,17 @@ class ProbeService {
       return undefined;
     }
 
-    return { executed: true, rows: buildRows(result.cells) };
+    const rows = buildRows(result.cells);
+
+    // Every input may have had fewer than two cells (e.g. one member was
+    // unusable per-input). If no row survived the comparability filter there is
+    // nothing honest to display.
+    if (rows.length === 0) {
+      logger.info('probe produced cells but no input had two or more comparable results — no divergence table');
+      return undefined;
+    }
+
+    return { executed: true, rows };
   }
 
   /** Spawn the sandbox and hold it to a hard wall-clock bound. */

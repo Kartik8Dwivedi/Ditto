@@ -389,10 +389,123 @@ describe('buildRows', () => {
   it('groups by input and omits the error field when nothing threw', () => {
     const rows = buildRows([
       cell({ functionId: 'a', input: '["x"]', key: 'return:"1"', output: '"1"' }),
+      cell({ functionId: 'b', input: '["x"]', key: 'return:"1"', output: '"1"' }),
       cell({ functionId: 'a', input: '["y"]', key: 'return:"2"', output: '"2"' }),
+      cell({ functionId: 'b', input: '["y"]', key: 'return:"2"', output: '"2"' }),
     ]);
 
     expect(rows.map((r) => r.input)).toEqual(['["x"]', '["y"]']);
     expect(rows[0].results[0]).not.toHaveProperty('error');
   });
+
+  it('drops a single-cell group instead of reporting it as agreement', () => {
+    // One measured member is a data point, not an agreement. A group with
+    // only one cell has nothing to compare and must produce no row.
+    const rows = buildRows([
+      cell({ functionId: 'b', key: 'return:0', output: '0' }),
+    ]);
+    expect(rows).toEqual([]);
+  });
+
+  it('distinguishes: 1 cell → dropped, 2 equal → agreement, 2 different → divergence', () => {
+    const rows = buildRows([
+      // Input [0]: only one member produced a cell → must be dropped
+      cell({ functionId: 'b', input: '[0]', key: 'return:0', output: '0' }),
+      // Input [1]: two equal cells → agreement row
+      cell({ functionId: 'a', input: '[1]', key: 'return:2', output: '2' }),
+      cell({ functionId: 'b', input: '[1]', key: 'return:2', output: '2' }),
+      // Input [2]: two different cells → divergence row
+      cell({ functionId: 'a', input: '[2]', key: 'return:4', output: '4' }),
+      cell({ functionId: 'b', input: '[2]', key: 'return:5', output: '5' }),
+    ]);
+
+    expect(rows).toHaveLength(2);
+    // [0] is absent — not falsely reported as agreement
+    expect(rows.find((r) => r.input === '[0]')).toBeUndefined();
+    // [1] is an agreement
+    expect(rows.find((r) => r.input === '[1]')!.diverged).toBe(false);
+    // [2] is a divergence
+    expect(rows.find((r) => r.input === '[2]')!.diverged).toBe(true);
+  });
+
+  it('returns no rows when every input has fewer than two cells', () => {
+    const rows = buildRows([
+      cell({ functionId: 'a', input: '[0]', key: 'return:1', output: '1' }),
+      cell({ functionId: 'b', input: '[1]', key: 'return:2', output: '2' }),
+    ]);
+    // Each input has only one cell — nothing is comparable
+    expect(rows).toEqual([]);
+  });
+});
+
+describe('ProbeService.probe — Python runner unserialisable-per-input regression', () => {
+  it('does not produce a false agreement when one member is unusable for a single input', async () => {
+    // Reproduction: member `a` returns Box() (unserialisable) for x == 0 but
+    // works for x == 1. Member `b` always works. The [0] row has only one cell
+    // and must NOT appear as agreement.
+    const table = await new ProbeService().probe(
+      [
+        {
+          id: 'fn-a',
+          body: [
+            'class Box:',
+            '    pass',
+            'def f(x):',
+            '    if x == 0:',
+            '        return Box()',
+            '    return x * 2',
+          ].join('\n'),
+          isPure: true,
+          language: 'python',
+        },
+        {
+          id: 'fn-b',
+          body: 'def f(x):\n    return x * 2',
+          isPure: true,
+          language: 'python',
+        },
+      ],
+      ['[0]', '[1]'],
+    );
+
+    expect(table).toBeDefined();
+    expect(table!.executed).toBe(true);
+
+    // [0]: fn-a returned Box() (unserialisable → no cell), fn-b returned 0.
+    // Only one cell → incomparable → must be omitted.
+    const row0 = table!.rows.find((r) => r.input === '[0]');
+    expect(row0).toBeUndefined();
+
+    // [1]: both return 2 → normal agreement.
+    const row1 = table!.rows.find((r) => r.input === '[1]');
+    expect(row1).toBeDefined();
+    expect(row1!.diverged).toBe(false);
+    expect(row1!.results).toHaveLength(2);
+  }, 15_000);
+
+  it('returns no table when every input is incomparable', async () => {
+    // Both inputs produce unserialisable returns for member `a`, leaving
+    // only member `b` with cells → no comparable rows → no table.
+    const table = await new ProbeService().probe(
+      [
+        {
+          id: 'fn-a',
+          body: 'class Box:\n    pass\ndef f(x):\n    return Box()',
+          isPure: true,
+          language: 'python',
+        },
+        {
+          id: 'fn-b',
+          body: 'def f(x):\n    return x',
+          isPure: true,
+          language: 'python',
+        },
+      ],
+      ['[0]', '[1]'],
+    );
+
+    // fn-a is unusable for every input, so no row has two cells.
+    // probe() should return undefined (no honest table to show).
+    expect(table).toBeUndefined();
+  }, 15_000);
 });
