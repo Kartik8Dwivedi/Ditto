@@ -14,7 +14,8 @@ export const connectToDB = async (): Promise<Connection> => {
   mongoose.connection.on('error', (err) => logger.error('MongoDB error:', err));
   mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
 
-  await mongoose.connect(AppConfig.MONGO_URI);
+  // MONGO_URI is guaranteed present by the server startup validation in src/index.ts
+  await mongoose.connect(AppConfig.MONGO_URI!);
   return mongoose.connection;
 };
 
