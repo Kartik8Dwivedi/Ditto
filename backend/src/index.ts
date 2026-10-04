@@ -1,5 +1,7 @@
 import createApp from './app.js';
 import AppConfig from './Config/AppConfig.js';
+import AppError from './Utils/errors/AppError.js';
+import { StatusCodes } from 'http-status-codes';
 import logger from './Config/logger.js';
 import { connectToDB, disconnectFromDB } from './Config/db.js';
 import { describeLiveCaps } from './Services/analysis.service.js';
@@ -11,6 +13,21 @@ import { describeLiveCaps } from './Services/analysis.service.js';
  *   3. shut everything down cleanly on signals / fatal errors
  */
 const start = async (): Promise<void> => {
+  
+  if (!AppConfig.MONGO_ENABLED) {
+    throw new AppError(
+      'Server startup requires MONGO_URI environment variable',
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+  
+  if (!AppConfig.OPENAI_ENABLED) {
+    throw new AppError(
+      'Server startup requires OPENAI_API_KEY environment variable',
+      StatusCodes.INTERNAL_SERVER_ERROR
+    );
+  }
+  
   await connectToDB();
 
   const app = createApp();

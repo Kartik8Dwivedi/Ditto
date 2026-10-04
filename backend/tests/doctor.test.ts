@@ -32,6 +32,32 @@ describe('formatDoctorReport', () => {
     expect(report).toContain('[SUCCESS] All checks passed! Ready to run Ditto.');
   });
 
+  it('reports which optional vars are actually present in env config detail', () => {
+    const checks: DoctorCheck[] = [
+      {
+        name: 'Environment configuration',
+        ok: true,
+        detail: 'valid (MONGO_URI present)',
+      },
+      {
+        name: 'Environment configuration',
+        ok: true,
+        detail: 'valid (OPENAI_API_KEY present)',
+      },
+      {
+        name: 'Environment configuration',
+        ok: true,
+        detail: 'valid (no optional vars set)',
+      },
+    ];
+
+    for (const check of checks) {
+      const { report } = formatDoctorReport([check]);
+      expect(report).toContain('✔ Environment configuration');
+      expect(report).toContain(check.detail);
+    }
+  });
+
   it('returns allOk: false and an ERROR summary when at least one check fails', () => {
     const checks: DoctorCheck[] = [
       {
