@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import IndexerService, { type IndexReport } from '../Services/indexer/indexer.service.js';
 import logger from '../Config/logger.js';
 
@@ -126,7 +127,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-main().catch((err: unknown) => {
-  logger.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err: unknown) => {
+    logger.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

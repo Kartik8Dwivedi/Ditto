@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import OpenAIService from '../Services/openai.service.js';
 import logger from '../Config/logger.js';
@@ -90,7 +91,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-main().catch((err: unknown) => {
-  logger.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err: unknown) => {
+    logger.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

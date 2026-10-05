@@ -59,7 +59,7 @@ describe('resolveProbeFile', () => {
   it('should work with nested directory paths', () => {
     mockExistsSync.mockReturnValueOnce(true);
     const result = resolveProbeFile(importMetaUrl, 'subdir/test-probe.js');
-    expect(result).toContain('subdir/test-probe.js');
+    expect(result).toContain(join('subdir', 'test-probe.js'));
   });
 
   it('should return direct path when .js file exists but .ts also exists (direct takes priority)', () => {
