@@ -266,6 +266,7 @@ cp .sample.env .env
 | `OPENAI_MODEL_FLAGSHIP` | no | Adjudication, one call per cluster. Default `gpt-5.6-terra`. |
 | `EMBEDDING_MODEL` | no | Default `text-embedding-3-small`. |
 | `GITHUB_TOKEN` | no | Raises GitHub's rate limit for the indexer. |
+| `CONFIDENCE_THRESHOLD` | no | A number from 0 to 1. Adjudicated confidence at or above it is reported as a duplicate, below it as a near-duplicate. Default `0.75`. |
 | `LIVE_MAX_FUNCTIONS` | no | Largest repo the **hosted** on-demand path will analyse. Default `2000`. |
 | `LIVE_CANDIDATE_CAP` | no | Clusters sent to the flagship on the hosted path. Default `100`. |
 | `LIVE_DEADLINE_MS` | no | Self-imposed time budget, default 18 min — below Cloud Run's 20 min timeout, so an overrun becomes an honest failed job instead of one stuck on "running". |
