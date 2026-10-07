@@ -44,6 +44,12 @@ const envSchema = z.object({
   // Shared secret for the X-Ditto-Task-Secret header on /internal/run.
   TASK_SECRET: z.string().min(1).optional(),
 
+  // The dial between "duplicate" and "near-duplicate": adjudicated confidence at
+  // or above it is reported as a duplicate, below it as a near-duplicate. It
+  // picks the verdict wording on the offline pipeline, the stats read path and
+  // both live paths. It does NOT bound spend, so it is not part of LIVE CAPS.
+  CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.75),
+
   /**
    * LIVE CAPS — the only knobs separating a rich demo run from a cheap one.
    * Changing mode is an env edit + redeploy, never a code change:
@@ -57,7 +63,6 @@ const envSchema = z.object({
    * These bound the LIVE path only. The offline CLI pipeline is unaffected and
    * keeps its full-run behaviour.
    */
-  CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.75),
   LIVE_MAX_FUNCTIONS: z.coerce.number().int().positive().default(2000),
   LIVE_CANDIDATE_CAP: z.coerce.number().int().positive().default(100),
   /**
