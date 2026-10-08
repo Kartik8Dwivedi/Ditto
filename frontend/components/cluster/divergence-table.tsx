@@ -55,6 +55,24 @@ function referenceKeyFor(row: DivergenceRow, canonicalId: string | undefined): s
   return bestCount > 1 ? best : undefined;
 }
 
+/** Returns the result IDs that should be highlighted as disagreeing in a row. */
+export function flaggedResultIds(row: DivergenceRow, canonicalId: string | undefined): Set<string> {
+  const flagged = new Set<string>();
+  if (!row.diverged) return flagged;
+
+  const reference = referenceKeyFor(row, canonicalId);
+  for (const result of row.results) {
+    if (
+      reference === undefined ||
+      resultKey(result) !== reference ||
+      Boolean(result.error)
+    ) {
+      flagged.add(result.functionId);
+    }
+  }
+  return flagged;
+}
+
 export function DivergenceTable({ cluster }: { cluster: ClusterDetail }) {
   const { divergence, members } = cluster;
   if (!divergence || divergence.rows.length === 0) return null;
@@ -131,7 +149,7 @@ export function DivergenceTable({ cluster }: { cluster: ClusterDetail }) {
           </thead>
           <tbody>
             {divergence.rows.map((row, rowIndex) => {
-              const reference = referenceKeyFor(row, canonicalId);
+              const flagged = flaggedResultIds(row, canonicalId);
               return (
                 <tr
                   key={rowIndex}
@@ -158,10 +176,9 @@ export function DivergenceTable({ cluster }: { cluster: ClusterDetail }) {
                     }
 
                     const threw = Boolean(result.error);
-                    const odd = reference !== undefined && resultKey(result) !== reference;
                     // A throw is only remarkable if the row actually disagreed:
                     // every member throwing the same error is agreement.
-                    const flag = row.diverged && (odd || threw);
+                    const flag = flagged.has(result.functionId);
 
                     return (
                       <td key={member.id} className="px-2.5 py-2 align-middle whitespace-nowrap">
