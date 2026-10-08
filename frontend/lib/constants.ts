@@ -31,3 +31,12 @@ export function stageIndex(stage: JobStage | null | undefined): number | null {
   const i = PIPELINE_STAGES.findIndex((s) => s.id === stage);
   return i === -1 ? null : i;
 }
+
+export function stageStatus(
+  index: number,
+  active: number,
+): 'done' | 'running' | 'pending' {
+  if (index < active) return 'done';
+  if (index === active) return 'running';
+  return 'pending';
+}

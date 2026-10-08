@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, LoaderCircle } from 'lucide-react';
 import type { JobStage } from '@/types/ditto';
-import { PIPELINE_STAGES, stageIndex } from '@/lib/constants';
+import { PIPELINE_STAGES, stageIndex, stageStatus } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { DittoMark } from '@/components/ui/ditto-mark';
 
@@ -18,8 +18,8 @@ const STEP_MS = 420;
  *  - Controlled (`stageId` given): the active row is driven by a job's live
  *    `stage`, so the stepper only advances when the backend actually does.
  *  - Uncontrolled (no `stageId`): a gentle timer walks the stages and stops at
- *    the last one. Used by the route-level loading fallback, where we have no
- *    job to read — it never claims a stage completed, it just shows life.
+ *    the last one. This mode is retained for callers that do not have live
+ *    job state.
  */
 export function PipelineProgress({
   stageId,
@@ -58,10 +58,20 @@ export function PipelineProgress({
           {subtitle ?? (active < 0 ? 'Queued…' : ' ')}
         </p>
 
+        {controlled && (
+          <p className="sr-only" role="status" aria-live="polite">
+            {active < 0
+              ? 'Queued'
+              : `Step ${active + 1} of ${PIPELINE_STAGES.length}: ${PIPELINE_STAGES[active]?.label
+              }`}
+          </p>
+        )}
+
         <ol className="space-y-0.5">
           {PIPELINE_STAGES.map((stage, index) => {
-            const done = index < active;
-            const running = index === active;
+            const status = stageStatus(index, active);
+            const done = status === 'done';
+            const running = status === 'running';
             return (
               <li
                 key={stage.id}
@@ -69,6 +79,7 @@ export function PipelineProgress({
                   'flex items-start gap-3 rounded px-2 py-1.5 transition-colors duration-200',
                   running && 'bg-inset',
                 )}
+                aria-current={running ? 'step' : undefined}
               >
                 <span className="mt-0.5 flex size-3.5 shrink-0 items-center justify-center">
                   {done ? (
@@ -89,6 +100,13 @@ export function PipelineProgress({
                     )}
                   >
                     {stage.label}
+                  </span>
+                  <span className="sr-only">
+                    {status === 'done'
+                      ? 'completed'
+                      : status === 'running'
+                        ? 'in progress'
+                        : 'not started'}
                   </span>
                   {running && (
                     <span className="animate-fade-in block text-[11px] text-ink-subtle">
