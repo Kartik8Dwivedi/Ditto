@@ -28,6 +28,7 @@ export interface ICluster {
    */
   isSuppressed?: boolean;
   suppressionReason?: string;
+  languages: Array<'ts' | 'python'>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -67,12 +68,25 @@ const divergenceRowSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const skippedMemberSchema = new mongoose.Schema(
+  {
+    functionId: { type: String, required: true },
+    reason: {
+      type: String,
+      enum: ['impure', 'unsupported-language', 'unusable'],
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const divergenceSchema = new mongoose.Schema<DivergenceTable>(
   {
     // Never defaults to true. It is set by the prober, and only after real code
     // has really run.
     executed: { type: Boolean, required: true, default: false },
     rows: { type: [divergenceRowSchema], default: [] },
+    skipped: { type: [skippedMemberSchema], default: undefined },
   },
   { _id: false }
 );
@@ -100,6 +114,11 @@ const clusterSchema = new mongoose.Schema<ICluster>(
     divergence: { type: divergenceSchema, default: undefined },
     isSuppressed: { type: Boolean, default: false },
     suppressionReason: { type: String, default: undefined },
+    languages: {
+      type: [String],
+      enum: ['ts', 'python'],
+      default: ['ts'],
+    },
   },
   {
     timestamps: true,

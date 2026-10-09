@@ -269,6 +269,7 @@ cp .sample.env .env
 | `LIVE_MAX_FUNCTIONS` | no | Largest repo the **hosted** on-demand path will analyse. Default `2000`. |
 | `LIVE_CANDIDATE_CAP` | no | Clusters sent to the flagship on the hosted path. Default `100`. |
 | `LIVE_DEADLINE_MS` | no | Self-imposed time budget, default 18 min — below Cloud Run's 20 min timeout, so an overrun becomes an honest failed job instead of one stuck on "running". |
+| `CLUSTER_CROSS_LANGUAGE` | no | Policy for pairing TS and Python functions in the same cluster: `allow` (default) or `deny`. |
 
 > Model IDs live in env on purpose. A *"model not found"* 404 is a value to change here, never a code edit.
 
@@ -338,7 +339,7 @@ Import the repo, set **Root Directory** to `frontend`, and add `NEXT_PUBLIC_API_
 
 We'd rather tell you than have you find out:
 
-- **JavaScript / TypeScript only.** The AST layer is `ts-morph`.
+- **JavaScript / TypeScript and Python only.**  Extracted via `ts-morph` and `tree-sitter`, functions share an embedding space to find cross-language duplicates; unexecuted members are explicitly tracked under `skipped`.
 - **We proved divergence on three utility families** — string truncation, money parsing, email validation. Not eight. (Phone normalisation, for instance, barely exists in serious OSS JS; everyone imports `libphonenumber-js`.)
 - **Execution requires purity.** Functions touching I/O, network, or a database are clustered and adjudicated but never executed. Their divergence is shown as *predicted* and clearly labelled as such.
 - **Large repos are scoped, not truncated.** You pass an explicit `--scope` subtree, so a cluster member is never silently dropped — a missing member doesn't degrade a cluster, it makes the cluster disappear, and the repo then reads as clean.

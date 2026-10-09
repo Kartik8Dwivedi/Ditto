@@ -23,6 +23,7 @@ const fn = (overrides: Partial<ClusterableFunction> & { id: string }): Clusterab
   isPure: true,
   inputs: ['string'],
   outputs: ['string'],
+  language: 'ts',
   ...overrides,
 });
 

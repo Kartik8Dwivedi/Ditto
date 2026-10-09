@@ -26,22 +26,25 @@ interface CliArgs {
   cacheDir?: string;
   maxFunctions?: number;
   json?: boolean;
+  crossLanguage?: 'allow' | 'deny';
 }
 
 const usage = `Usage: npm run pipeline -- <owner>/<repo> [--cache-dir <path>] [--max <n>]
 
-  <owner>/<repo>     the repo to analyse; reads backend/.cache/<owner>-<repo>.json
-  --cache-dir <path> where the extractor wrote its cache (default: backend/.cache)
-  --max <n>          cap the number of functions analysed
-  --json             emit results as machine-readable JSON to stdout`;
+  <owner>/<repo>                the repo to analyse; reads backend/.cache/<owner>-<repo>.json
+  --cache-dir <path>            where the extractor wrote its cache (default: backend/.cache)
+  --max <n>                     cap the number of functions analysed
+  --cross-language <allow|deny> allow or deny cross-language clusters (default: from env / allow)
+  --json                        emit results as machine-readable JSON to stdout`;
 
 export const parseArgs = (argv: string[]): CliArgs => {
   let slug: string | undefined;
   let cacheDir: string | undefined;
   let maxFunctions: number | undefined;
+  let crossLanguage: 'allow' | 'deny' | undefined;
   let json = false;
 
-  const takesValue = new Set(['--cache-dir', '--max']);
+  const takesValue = new Set(['--cache-dir', '--max', '--cross-language']);
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -53,6 +56,11 @@ export const parseArgs = (argv: string[]): CliArgs => {
       }
       if (arg === '--cache-dir') {
         cacheDir = value;
+      } else if (arg === '--cross-language') {
+        if (value !== 'allow' && value !== 'deny') {
+          throw new Error(`--cross-language needs 'allow' or 'deny'.\n\n${usage}`);
+        }
+        crossLanguage = value;
       } else {
         maxFunctions = Number(value);
       }
@@ -76,7 +84,7 @@ export const parseArgs = (argv: string[]): CliArgs => {
     throw new Error(`--max needs a positive integer.\n\n${usage}`);
   }
 
-  return { owner, name, cacheDir, maxFunctions, json };
+  return { owner, name, cacheDir, maxFunctions, json, crossLanguage };
 };
 
 const printReport = (report: PipelineReport, json = false): void => {
@@ -104,6 +112,7 @@ const printReport = (report: PipelineReport, json = false): void => {
     files ...................... ${stats.files}
     modules .................... ${stats.modules}
     semantic duplicate clusters  ${stats.semanticDuplicateClusters}
+    cross-language clusters .... ${stats.crossLanguageClusters}
     suppressed (intentional) ... ${stats.suppressedClusters}
     behavioural conflicts ...... ${stats.behavioralConflicts}
     near-duplicates ............ ${stats.nearDuplicates}

@@ -115,16 +115,18 @@ const toClusterable = (doc: HydratedDocument<IFunction>): ClusterableFunction =>
   inputs: doc.fingerprint?.inputs ?? [],
   outputs: doc.fingerprint?.outputs ?? [],
   file: doc.file,
+  language: (doc.language as 'ts' | 'python') ?? 'ts'
 });
 
 /** Nearest compatible neighbour by cosine — the same search Guard runs. */
 const findBestMatch = (
   probe: ClusterableFunction,
-  index: ClusterableFunction[]
+  index: ClusterableFunction[],
+  options: { crossLanguage?: 'allow' | 'deny' } = { crossLanguage: AppConfig.CLUSTER_CROSS_LANGUAGE }
 ): { id: string; similarity: number } | null => {
   let best: { id: string; similarity: number } | null = null;
   for (const candidate of index) {
-    if (!isCompatible(probe, candidate)) continue;
+    if (!isCompatible(probe, candidate, options)) continue;
     const similarity = cosineSimilarity(probe.embedding, candidate.embedding);
     if (!best || similarity > best.similarity) best = { id: candidate.id, similarity };
   }
@@ -587,6 +589,7 @@ class PrService {
         inputs: fingerprint.inputs,
         outputs: fingerprint.outputs,
         file: fn.file,
+        language: fn.language,
       };
 
       const best = findBestMatch(prClusterable, index);
