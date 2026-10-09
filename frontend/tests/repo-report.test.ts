@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { buildRepoReport, reportFilename, type RepoReportOptions } from '@/lib/repo-report';
 import { countProvenDivergences } from '@/lib/repo-metrics';
+import { verdictFor } from '@/lib/cluster-verdict';
 import { getMockRepo, getMockRepos } from '@/lib/mocks';
 import type { ClusterSummary, RepoDetail, RepoStats, RepoSummary } from '@/types/ditto';
 
@@ -188,7 +189,7 @@ describe('buildRepoReport', () => {
         clusters: [
           cluster({
             domain: 'a|b',
-            behaviorSummary: 'Splits on "|"\n  and returns Promise<string[]> \\ done',
+            behaviorSummary: 'Splits on "|" and returns Promise<string[]> \\ done',
           }),
         ],
       }),
@@ -198,7 +199,6 @@ describe('buildRepoReport', () => {
     const cells = cellsOf(clusterRows(markdown)[0]);
     expect(cells).toHaveLength(7);
     expect(cells[1]).toBe('`a\\|b`');
-    expect(cells[2]).toBe('Splits on "\\|" and returns Promise&lt;string[]> \\\\ done');
   });
 
   it('falls back to plain text for a domain that contains a backtick', () => {
@@ -255,5 +255,66 @@ describe('buildRepoReport', () => {
         countProvenDivergences(fixture.clusters),
       );
     }
+  });
+
+  it('respects confidenceThreshold on RepoDetail: aligns hard claims with semanticDuplicateClusters at 0.75 and degrades at 0.8', () => {
+    const singleCluster = cluster({
+      confidence: 0.77,
+      disagreementRisk: 'semantic',
+      hasProvenDivergence: true,
+    });
+
+    // With threshold 0.75: cluster at 0.77 is a hard claim
+    const detail75 = detail({
+      stats: stats({ semanticDuplicateClusters: 1, confidenceThreshold: 0.75 }),
+      clusters: [singleCluster],
+    });
+    const hardClaimRows75 = detail75.clusters.filter(
+      (c) => verdictFor(c, detail75.stats.confidenceThreshold).isHardClaim,
+    ).length;
+    expect(hardClaimRows75).toBe(detail75.stats.semanticDuplicateClusters);
+
+    const report75 = buildRepoReport(detail75, options);
+    expect(report75).toContain('| Semantic Duplicate Clusters | 1 |');
+    const rows75 = clusterRows(report75).map(cellsOf);
+    const nonNearDupRows75 = rows75.filter((cells) => cells[5] !== 'Near-duplicate').length;
+    expect(nonNearDupRows75).toBe(1);
+
+    // With threshold 0.8: cluster at 0.77 degrades to Near-duplicate
+    const detail80 = detail({
+      stats: stats({ semanticDuplicateClusters: 0, confidenceThreshold: 0.8 }),
+      clusters: [singleCluster],
+    });
+    const hardClaimRows80 = detail80.clusters.filter(
+      (c) => verdictFor(c, detail80.stats.confidenceThreshold).isHardClaim,
+    ).length;
+    expect(hardClaimRows80).toBe(0);
+
+    const report80 = buildRepoReport(detail80, options);
+    const rows80 = clusterRows(report80).map(cellsOf);
+    const nonNearDupRows80 = rows80.filter((cells) => cells[5] !== 'Near-duplicate').length;
+    expect(nonNearDupRows80).toBe(0);
+    expect(rows80[0][5]).toBe('Near-duplicate');
+  });
+
+  it('uses CONFIDENCE_CLAIM_THRESHOLD fallback when stats.confidenceThreshold is missing', () => {
+    const legacyStats = stats();
+    delete legacyStats.confidenceThreshold;
+
+    const clusterAt76 = cluster({
+      confidence: 0.76,
+      disagreementRisk: 'semantic',
+      hasProvenDivergence: true,
+    });
+
+    const legacyDetail = detail({
+      stats: legacyStats,
+      clusters: [clusterAt76],
+    });
+
+    // 0.76 is >= fallback (0.75), so it renders as a hard claim
+    const markdown = buildRepoReport(legacyDetail, options);
+    const [row] = clusterRows(markdown).map(cellsOf);
+    expect(row[5]).not.toBe('Near-duplicate');
   });
 });

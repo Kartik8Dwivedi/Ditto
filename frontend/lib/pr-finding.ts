@@ -43,6 +43,7 @@ export function findingDiverged(finding: PrFinding): boolean {
 export function findingToCluster(finding: PrFinding, index: number): ClusterDetail {
   const proven = findingDiverged(finding);
   const bothPure = finding.proof === 'executed';
+  const isDuplicate = finding.verdict === 'duplicate';
 
   const members: ClusterMember[] = [];
 
@@ -81,10 +82,10 @@ export function findingToCluster(finding: PrFinding, index: number): ClusterDeta
       ? `Reinvents ${finding.match.name}`
       : 'New behaviour introduced by this PR',
     memberCount: members.length,
-    confidence: finding.confidence,
-    // Only a proven, confident, semantic disagreement is allowed to scream red;
-    // `isProvenConflict` (used by DivergenceTable) also requires confidence ≥
-    // the claim threshold, so a low-confidence executed diff still degrades.
+    // The backend verdict is the single authority on the PR surface:
+    // a finding with verdict: 'duplicate' is always a hard claim,
+    // while 'near-duplicate' / 'novel' is never a hard claim regardless of raw confidence.
+    confidence: isDuplicate ? 1 : 0,
     disagreementRisk: proven ? 'semantic' : 'none',
     hasProvenDivergence: proven,
     linesRemovable: 0,

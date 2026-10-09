@@ -12,7 +12,7 @@ import { ConfidenceMeter } from './confidence-meter';
 import { DivergenceTable } from './divergence-table';
 import { ImplementationCard } from './implementation-card';
 
-export function ClusterDrawer() {
+export function ClusterDrawer({ threshold }: { threshold?: number } = {}) {
   const clusterId = useClusterDrawer((s) => s.openClusterId);
   const close = useClusterDrawer((s) => s.closeCluster);
 
@@ -54,7 +54,12 @@ export function ClusterDrawer() {
       >
         {/* Keyed on the cluster id so switching clusters remounts and the
             fetch state resets on its own, rather than being reset by hand. */}
-        <ClusterDrawerContent key={clusterId} clusterId={clusterId} onClose={close} />
+        <ClusterDrawerContent
+          key={clusterId}
+          clusterId={clusterId}
+          onClose={close}
+          threshold={threshold}
+        />
       </aside>
     </div>
   );
@@ -63,9 +68,11 @@ export function ClusterDrawer() {
 function ClusterDrawerContent({
   clusterId,
   onClose,
+  threshold,
 }: {
   clusterId: string;
   onClose: () => void;
+  threshold?: number;
 }) {
   const [cluster, setCluster] = useState<ClusterDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +108,7 @@ function ClusterDrawerContent({
           onClick={() => {
             setCluster(null);
             setError(null);
-            setAttempt((prev) => prev + 1)
+            setAttempt((prev) => prev + 1);
           }}
           className="inline-flex items-center gap-1.5 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 font-mono text-[12px] text-ink transition-colors duration-150 hover:bg-inset"
         >
@@ -112,7 +119,7 @@ function ClusterDrawerContent({
     );
   }
   if (!cluster) return <DrawerSkeleton onClose={onClose} />;
-  return <ClusterBody cluster={cluster} onClose={onClose} />;
+  return <ClusterBody cluster={cluster} onClose={onClose} threshold={threshold} />;
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {
@@ -128,8 +135,16 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ClusterBody({ cluster, onClose }: { cluster: ClusterDetail; onClose: () => void }) {
-  const verdict = verdictFor(cluster);
+function ClusterBody({
+  cluster,
+  onClose,
+  threshold,
+}: {
+  cluster: ClusterDetail;
+  onClose: () => void;
+  threshold?: number;
+}) {
+  const verdict = verdictFor(cluster, threshold);
 
   return (
     <>
@@ -156,7 +171,7 @@ function ClusterBody({ cluster, onClose }: { cluster: ClusterDetail; onClose: ()
         </div>
 
         <div className="mt-3.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-          <ConfidenceMeter confidence={cluster.confidence} />
+          <ConfidenceMeter confidence={cluster.confidence} threshold={threshold} />
           <span className="text-[11px] text-ink-subtle">
             <span className="tnum font-mono text-ink-muted">{cluster.memberCount}</span>{' '}
             implementations
@@ -191,7 +206,7 @@ function ClusterBody({ cluster, onClose }: { cluster: ClusterDetail; onClose: ()
         </section>
 
         {cluster.divergence ? (
-          <DivergenceTable cluster={cluster} />
+          <DivergenceTable cluster={cluster} threshold={threshold} />
         ) : (
           <section className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-3">
             <SectionTitle>Behavioral comparison</SectionTitle>

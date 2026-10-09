@@ -5,7 +5,7 @@
  * this module, so the colour language stays consistent and, more importantly,
  * so the honesty rules are enforced in exactly one place:
  *
- *   · confidence < 0.8  → we are not sure these are even the same thing, so we
+ *   · confidence < threshold  → we are not sure these are even the same thing, so we
  *     degrade to a dashed "near-duplicate" lead and never make a hard claim.
  *   · not executed      → the model suspects; it has not proven. 🤖, never 🔴.
  *   · cosmetic          → amber. Calling a separator change a bug is crying wolf.
@@ -23,8 +23,11 @@ export type ClusterVerdict = {
   blurb: string;
 };
 
-export function verdictFor(cluster: ClusterSummary): ClusterVerdict {
-  if (cluster.confidence < CONFIDENCE_CLAIM_THRESHOLD) {
+export function verdictFor(
+  cluster: ClusterSummary,
+  threshold: number = CONFIDENCE_CLAIM_THRESHOLD,
+): ClusterVerdict {
+  if (cluster.confidence < threshold) {
     return {
       label: 'Near-duplicate',
       tone: 'neutral',
@@ -80,19 +83,24 @@ export function verdictFor(cluster: ClusterSummary): ClusterVerdict {
 export function rowVerdictLabel(
   cluster: ClusterSummary,
   executed: boolean,
+  threshold: number = CONFIDENCE_CLAIM_THRESHOLD
 ): string {
   if (!executed) return '✕ suspected';
-  if (!verdictFor(cluster).isHardClaim) return '≠ differs';
+  if (!verdictFor(cluster, threshold).isHardClaim) return '≠ differs';
   if (cluster.disagreementRisk === 'cosmetic') return '≠ cosmetic';
   return '✕ conflict';
 }
 
 /** Only a proven, confident, semantic disagreement is allowed to scream red. */
-export function isProvenConflict(cluster: ClusterSummary, executed: boolean): boolean {
+export function isProvenConflict(
+  cluster: ClusterSummary,
+  executed: boolean,
+  threshold: number = CONFIDENCE_CLAIM_THRESHOLD,
+): boolean {
   return (
     executed &&
     cluster.disagreementRisk === 'semantic' &&
-    verdictFor(cluster).isHardClaim &&
+    verdictFor(cluster, threshold).isHardClaim &&
     cluster.hasProvenDivergence
   );
 }

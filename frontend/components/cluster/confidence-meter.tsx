@@ -4,18 +4,22 @@ import { cn } from '@/lib/utils';
 /**
  * Confidence that the members really are the same thing.
  *
- * The 0.8 bar is drawn on the meter itself, so a reader can see for themselves
- * which side of it a finding sits on rather than taking our word for it.
+ * The confidence threshold bar is drawn on the meter itself, so a reader can see
+ * for themselves which side of it a finding sits on rather than taking our word
+ * for it. The threshold is passed in so it reflects what the backend actually used.
  */
 export function ConfidenceMeter({
   confidence,
+  threshold = CONFIDENCE_CLAIM_THRESHOLD,
   className,
 }: {
   confidence: number;
+  threshold?: number;
   className?: string;
 }) {
   const pct = Math.round(confidence * 100);
-  const meets = confidence >= CONFIDENCE_CLAIM_THRESHOLD;
+  const thresholdPct = Math.round(threshold * 100);
+  const meets = confidence >= threshold;
 
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
@@ -37,7 +41,7 @@ export function ConfidenceMeter({
         <div
           aria-hidden
           className="absolute inset-y-0 w-px bg-ink/50"
-          style={{ left: `${CONFIDENCE_CLAIM_THRESHOLD * 100}%` }}
+          style={{ left: `${thresholdPct}%` }}
         />
       </div>
       <span className={cn('tnum font-mono text-[11px]', meets ? 'text-ink' : 'text-ink-muted')}>
@@ -45,7 +49,7 @@ export function ConfidenceMeter({
       </span>
       {!meets && (
         <span className="text-[11px] text-ink-subtle">
-          below the {CONFIDENCE_CLAIM_THRESHOLD.toFixed(2)} bar — reported as a lead
+          below the {threshold.toFixed(2)} bar — reported as a lead
         </span>
       )}
     </div>

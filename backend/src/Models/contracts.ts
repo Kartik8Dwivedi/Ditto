@@ -204,6 +204,8 @@ export type RepoStats = {
   functionsTotal: number;
   /** Number of clusters marked as intentional / suppressed */
   suppressedClusters?: number;
+  /** The confidence threshold used for determining semantic duplicate clusters */
+  confidenceThreshold: number;
 };
 
 /* ------------------------------------------------------------------ *
