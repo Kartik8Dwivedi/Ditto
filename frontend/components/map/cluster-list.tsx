@@ -11,9 +11,17 @@ import { sortByRisk } from '@/lib/mocks/derive';
 import { useMemo, useState } from 'react';
 import { ClusterToolbar, SortOption } from './cluster-toolbar';
 
-function ClusterRow({ cluster, index }: { cluster: ClusterSummary; index: number }) {
+function ClusterRow({
+  cluster,
+  index,
+  threshold,
+}: {
+  cluster: ClusterSummary;
+  index: number;
+  threshold?: number;
+}) {
   const openCluster = useClusterDrawer((s) => s.openCluster);
-  const verdict = verdictFor(cluster);
+  const verdict = verdictFor(cluster, threshold);
   const soft = !verdict.isHardClaim;
 
   return (
@@ -84,7 +92,13 @@ function ClusterRow({ cluster, index }: { cluster: ClusterSummary; index: number
   );
 }
 
-export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
+export function ClusterList({
+  clusters,
+  threshold,
+}: {
+  clusters: ClusterSummary[];
+  threshold?: number;
+}) {
   const [search, setSearch] = useState('');
   const [selectedVerdict, setSelectedVerdict] = useState<string>('all');
   const [provenOnly, setProvenOnly] = useState(false);
@@ -99,7 +113,7 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
       }
 
       if (selectedVerdict !== 'all') {
-        const verdict = verdictFor(cluster);
+        const verdict = verdictFor(cluster, threshold);
         if (verdict.label !== selectedVerdict) return false;
       }
 
@@ -118,7 +132,7 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
       return filtered.sort((a, b) => b.memberCount - a.memberCount);
     }
     return sortByRisk(filtered);
-  }, [clusters, search, selectedVerdict, provenOnly, sortBy]);
+  }, [clusters, search, selectedVerdict, provenOnly, sortBy, threshold]);
     
   if (clusters.length === 0) {
     return (
@@ -170,7 +184,12 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
 
         {visibleClusters.length > 0 ? (
           visibleClusters.map((cluster, index) => (
-            <ClusterRow key={cluster.id} cluster={cluster} index={index} />
+            <ClusterRow
+              key={cluster.id}
+              cluster={cluster}
+              index={index}
+              threshold={threshold}
+            />
           ))
         ) : (
           <div className="px-4 py-10 text-center">
@@ -190,7 +209,7 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
         )}
       </div>
 
-      <ClusterDrawer />
+      <ClusterDrawer threshold={threshold} />
     </>
   );
 }

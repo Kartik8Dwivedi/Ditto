@@ -41,6 +41,8 @@ export type RepoStats = {
    */
   functionsTotal: number;
   functionsAnalyzed: number;
+  /** The confidence threshold used by the backend to determine semantic duplicates */
+  confidenceThreshold?: number;
 };
 
 /**
@@ -191,10 +193,13 @@ export type AnalyzeResponse = {
  * degrade the finding to a dashed "near-duplicate". Graceful degradation is our
  * defence against a wrong finding. See PRD §4.3.
  */
-export const CONFIDENCE_CLAIM_THRESHOLD = 0.8;
+export const CONFIDENCE_CLAIM_THRESHOLD = 0.75;
 
-export function isHardClaim(cluster: Pick<ClusterSummary, 'confidence'>): boolean {
-  return cluster.confidence >= CONFIDENCE_CLAIM_THRESHOLD;
+export function isHardClaim(
+  cluster: Pick<ClusterSummary, "confidence">,
+  threshold: number = CONFIDENCE_CLAIM_THRESHOLD,
+): boolean {
+  return cluster.confidence >= threshold;
 }
 
 /* ------------------------------------------------------------------ *
