@@ -111,6 +111,12 @@ let sharedClient: OpenAI | null = null;
  * here, where we can tell a rate limit apart from a schema violation.
  */
 const getSharedClient = (): OpenAI => {
+  if (!AppConfig.OPENAI_ENABLED) {
+    throw new AppError(
+      'OpenAI is not configured: OPENAI_API_KEY is missing. This feature requires a valid API key.',
+      StatusCodes.BAD_REQUEST
+    );
+  }
   sharedClient ??= new OpenAI({
     apiKey: AppConfig.OPENAI_API_KEY,
     timeout: AppConfig.OPENAI_TIMEOUT_MS,

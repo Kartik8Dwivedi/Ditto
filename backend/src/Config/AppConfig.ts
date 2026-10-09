@@ -14,11 +14,11 @@ dotenv.config({ quiet: true });
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
-  MONGO_URI: z.string().min(1, 'MONGO_URI is required'),
+  MONGO_URI: z.string().min(1).optional(),
   // Comma-separated list of allowed CORS origins; "*" allows all.
   CORS_ORIGIN: z.string().default('*'),
 
-  OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
+  OPENAI_API_KEY: z.string().min(1).optional(),
   // Model ids move faster than any codebase. They live here, never in service
   // code: a "model not found" 404 is an env value to change, not a code change.
   // Both verified against OpenAI's docs on 2026-07-17.
@@ -135,6 +135,8 @@ const AppConfig = Object.freeze({
   LIVE_DEADLINE_MS: env.LIVE_DEADLINE_MS,
   LIVE_INDEX_QUOTA_PER_DAY: env.LIVE_INDEX_QUOTA_PER_DAY,
   LIVE_PR_QUOTA_PER_DAY: env.LIVE_PR_QUOTA_PER_DAY,
+  MONGO_ENABLED: Boolean(env.MONGO_URI),
+  OPENAI_ENABLED: Boolean(env.OPENAI_API_KEY),
   // Cloud Tasks is usable only when every piece it needs is present. Off in
   // local dev (→ /analyze runs the job inline); on in a configured deployment.
   TASKS_ENABLED: Boolean(

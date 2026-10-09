@@ -9,7 +9,7 @@ import { parsePrInput, type CreatePrBody, type PrIdParams } from '../Validators/
  * Per-PR analysis endpoints. Thin HTTP adapters over PrService — no try/catch,
  * asyncHandler forwards rejections to the error middleware.
  */
-const prService = new PrService();
+let prService: PrService | null = null;
 
 /**
  * POST /api/v1/pr — analyse a pull request against its already-indexed repo.
@@ -19,6 +19,7 @@ const prService = new PrService();
  * job→poll→results machinery drives the frontend unchanged.
  */
 export const createPr = async (req: Request, res: Response): Promise<void> => {
+  prService ??= new PrService();
   const input = parsePrInput(req.body as CreatePrBody);
   // req.ip is the REAL client IP behind Cloud Run (app.ts sets trust proxy=1);
   // it keys the per-IP/day spend budget.
@@ -32,6 +33,7 @@ export const createPr = async (req: Request, res: Response): Promise<void> => {
 
 /** GET /api/v1/pr/:id — fetch a finished PR analysis. */
 export const getPr = async (req: Request, res: Response): Promise<void> => {
+  prService ??= new PrService();
   const { id } = req.params as unknown as PrIdParams;
   const analysis = await prService.getAnalysis(id);
   sendSuccess(res, { data: analysis, message: 'PR analysis fetched' });
