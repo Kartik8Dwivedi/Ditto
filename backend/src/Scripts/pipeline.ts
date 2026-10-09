@@ -2,6 +2,7 @@ import PipelineService, { type PipelineReport } from '../Services/pipeline.servi
 import { pathToFileURL } from 'node:url';
 import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import logger from '../Config/logger.js';
+import AppConfig from '../Config/AppConfig.js';
 
 /**
  * `npm run pipeline -- <owner>/<repo>`
@@ -147,6 +148,13 @@ const main = async (): Promise<void> => {
 
   if (args.json) {
     logger.setSilent(true);
+  }
+
+  if (!AppConfig.MONGO_ENABLED) {
+    throw new Error('Pipeline requires MONGO_URI environment variable');
+  }
+  if (!AppConfig.OPENAI_ENABLED) {
+    throw new Error('Pipeline requires OPENAI_API_KEY environment variable');
   }
 
   await connectToDB();

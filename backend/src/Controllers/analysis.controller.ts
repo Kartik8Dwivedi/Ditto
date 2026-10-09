@@ -10,10 +10,11 @@ import type { AnalyzeBody, InternalRunBody, JobIdParams } from '../Validators/an
  * Thin HTTP adapters: validated input in, service call, standard envelope out.
  * No try/catch — asyncHandler forwards rejections to the error middleware.
  */
-const analysisService = new AnalysisService();
+let analysisService: AnalysisService | null = null;
 
 /** Paste-a-URL entry point: validate, dedup, queue. Returns fast, never blocks. */
 export const analyze = async (req: Request, res: Response): Promise<void> => {
+  analysisService ??= new AnalysisService();
   const { repoUrl } = req.body as AnalyzeBody;
   // req.ip is the REAL client IP behind Cloud Run (app.ts sets trust proxy=1);
   // it keys the per-IP/day INDEX budget.
@@ -29,6 +30,7 @@ export const analyze = async (req: Request, res: Response): Promise<void> => {
  * to completion, then reports ok so the queue does not retry a finished job.
  */
 export const runInternal = async (req: Request, res: Response): Promise<void> => {
+  analysisService ??= new AnalysisService();
   const { jobId } = req.body as InternalRunBody;
   await analysisService.runJob(jobId);
   sendSuccess(res, { data: { ok: true }, message: 'Job processed' });
@@ -36,6 +38,7 @@ export const runInternal = async (req: Request, res: Response): Promise<void> =>
 
 /** The polled status the frontend stepper reads every couple of seconds. */
 export const getJob = async (req: Request, res: Response): Promise<void> => {
+  analysisService ??= new AnalysisService();
   const { jobId } = req.params as unknown as JobIdParams;
   const job = await analysisService.getJob(jobId);
   sendSuccess(res, { data: job, message: 'Job fetched' });
