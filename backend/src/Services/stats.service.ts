@@ -105,6 +105,7 @@ export interface StatsCluster {
   confidence: number;
   disagreementRisk: DisagreementRisk;
   isSuppressed?: boolean;
+  languages?: Array<'ts' | 'python'>;
 }
 
 /** The directory a file lives in — our unit of "module". */
@@ -209,5 +210,6 @@ export const computeRepoStats = (
     functionsAnalyzed: functions.length,
     functionsTotal: functionsTotal ?? functions.length,
     suppressedClusters,
+    crossLanguageClusters: activeConfirmed.filter((c) => (c.languages?.length ?? 1) > 1).length,
   };
 };

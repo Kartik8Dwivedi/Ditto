@@ -32,6 +32,7 @@ import {
   type SuppressionMatcher,
 } from './indexer/suppression.js';
 import { parseDittoFile } from './indexer/ignore.js';
+import AppConfig from '../Config/AppConfig.js';
 
 /**
  * THE PIPELINE.
@@ -83,6 +84,7 @@ export interface PipelineOptions {
   /** Live-progress reporter — fires at each pipeline stage boundary. */
   onStage?: StageReporter;
   dittoIgnoreContent?: string;
+  crossLanguage?: 'allow' | 'deny';
 }
 
 export interface PipelineReport {
@@ -133,6 +135,7 @@ const toClusterable = (doc: HydratedDocument<IFunction>): ClusterableFunction =>
   inputs: doc.fingerprint?.inputs ?? [],
   outputs: doc.fingerprint?.outputs ?? [],
   file: doc.file,
+  language: (doc.language as 'ts' | 'python') ?? 'ts',
 });
 
 /** Stable identity for a candidate cluster, so cohesion survives adjudication. */
@@ -169,6 +172,7 @@ class PipelineService {
       maxFunctions,
       candidateCap,
       onStage,
+      crossLanguage = AppConfig.CLUSTER_CROSS_LANGUAGE
     } = options;
 
     // The live path supplies functions in memory; the local CLI reads the cache
@@ -259,9 +263,10 @@ class PipelineService {
     // ---- stage 3: cluster (deterministic, 0 tokens) ----
     await onStage?.('cluster');
     const analysable = saved.filter(isAnalysable);
-    const candidates = findCandidateClusters(
-      analysable.map(toClusterable),
-      candidateCap !== undefined ? { maxClusters: candidateCap } : {}
+    const candidates = findCandidateClusters(analysable.map(toClusterable), {
+      ...(candidateCap !== undefined ? { maxClusters: candidateCap } : {}),
+      crossLanguage,
+    }
     );
     // Guard against over-clustering: a generous threshold buys recall at the
     // cost of adjudication calls, so the candidate count and the biggest cluster
@@ -355,6 +360,7 @@ class PipelineService {
             ...(divergence ? { divergence } : {}),
             isSuppressed: isClusterSuppressed,
             ...(suppressionReason ? { suppressionReason } : {}),
+            languages: Array.from(new Set(members.map(member => member.language))),
           };
         })
       )
@@ -462,6 +468,7 @@ const toStatsCluster = (doc: Partial<ICluster>): StatsCluster => ({
   confidence: doc.confidence ?? 0,
   disagreementRisk: doc.disagreementRisk ?? 'none',
   isSuppressed: doc.isSuppressed ?? false,
+  languages: doc.languages
 });
 
 export default PipelineService;

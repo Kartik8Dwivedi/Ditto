@@ -91,6 +91,7 @@ export interface ClusterableFunction {
   outputs: string[];
   /** Repo-relative path, used to prioritise cross-module clusters. Optional. */
   file?: string;
+  language: 'ts' | 'python'
 }
 
 export interface CandidateCluster {
@@ -99,6 +100,7 @@ export interface CandidateCluster {
   cohesion: number;
   /** Distinct modules the members span. >1 means suspected reinvention. */
   moduleCount: number;
+  languageCount?: number;
 }
 
 export interface ClusterOptions {
@@ -108,6 +110,7 @@ export interface ClusterOptions {
   mergeFloor?: number;
   maxClusterSize?: number;
   maxClusters?: number;
+  crossLanguage?: 'allow' | 'deny';
 }
 
 /**
@@ -167,7 +170,14 @@ const typesMatch = (a: string, b: string): boolean => {
  * things, disagree about purity, or produce a different kind of value. Purity
  * matters twice over: it decides whether the prober may execute them at all.
  */
-export const isCompatible = (a: ClusterableFunction, b: ClusterableFunction): boolean => {
+export const isCompatible = (
+  a: ClusterableFunction,
+  b: ClusterableFunction,
+  options?: ClusterOptions
+): boolean => {
+  if (options?.crossLanguage === 'deny' && a.language !== b.language) {
+    return false;
+  }
   if (a.isPure !== b.isPure) return false;
   if (arityBucket(a.arity) !== arityBucket(b.arity)) return false;
 
@@ -291,6 +301,7 @@ export const findCandidateClusters = (
     mergeFloor = MERGE_FLOOR,
     maxClusterSize = MAX_CLUSTER_SIZE,
     maxClusters = MAX_CANDIDATE_CLUSTERS,
+    crossLanguage
   } = options;
 
   const usable = functions.filter((fn) => fn.embedding.length > 0);
@@ -302,7 +313,7 @@ export const findCandidateClusters = (
   // pairs are -Infinity so they can never merge.
   const simOf = (a: number, b: number): number => {
     if (a === b) return 1;
-    if (!isCompatible(usable[a], usable[b])) return -Infinity;
+    if (!isCompatible(usable[a], usable[b], { crossLanguage })) return -Infinity;
     if (vectors[a].length !== vectors[b].length) return -Infinity;
     return dot(vectors[a], vectors[b]);
   };
@@ -355,10 +366,12 @@ export const findCandidateClusters = (
     if (component.length < 2) continue;
     for (const group of averageLinkage(component, simOf, threshold, maxClusterSize)) {
       const modules = new Set(group.map((index) => moduleOf(usable[index].file ?? '')));
+      const languages = new Set(group.map((index) => usable[index].language));
       clusters.push({
         memberIds: group.map((index) => usable[index].id),
         cohesion: meanPairwise(group, simOf),
         moduleCount: modules.size,
+        languageCount: languages.size,
       });
     }
   }
@@ -379,6 +392,9 @@ export const findCandidateClusters = (
  */
 export const candidatePriority = (cluster: CandidateCluster): number => {
   const crossModule = cluster.moduleCount > 1 ? 2 : 0;
+  // A cross-language port is a stronger reinvention signal than a same-language
+  // local copy, but weaker than a cross-module duplicate within the same codebase.
+  const crossLanguage = (cluster.languageCount ?? 1) > 1 ? 1 : 0;
   const notExactDuplicate = cluster.cohesion < EXACT_DUPLICATE_COHESION ? 1 : 0;
-  return crossModule + notExactDuplicate;
+  return crossModule + crossLanguage + notExactDuplicate;
 };

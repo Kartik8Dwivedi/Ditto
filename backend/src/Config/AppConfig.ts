@@ -82,6 +82,7 @@ const envSchema = z.object({
    * message, leaving 120s of headroom to write the failure and respond.
    */
   LIVE_DEADLINE_MS: z.coerce.number().int().positive().default(1_080_000),
+  CLUSTER_CROSS_LANGUAGE: z.enum(['allow', 'deny']).default('allow'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -141,6 +142,7 @@ const AppConfig = Object.freeze({
     env.GCP_PROJECT && env.TASKS_LOCATION && env.TASKS_QUEUE && env.SERVICE_URL && env.TASK_SECRET
   ),
   RateLimiter,
+  CLUSTER_CROSS_LANGUAGE: env.CLUSTER_CROSS_LANGUAGE
 });
 
 export type AppConfigType = typeof AppConfig;

@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { describe, it, expect, vi } from 'vitest';
-import logger from '../src/Config/logger.js'
+import { describe, it, expect } from 'vitest';
 
 import ProbeService, {
   buildRows,
@@ -287,9 +286,7 @@ describe('ProbeService.probe — real execution', () => {
     expect(table!.rows[0].diverged).toBe(true);
   });
   
-  it('probes majority language and reports dropped members in a mixed cluster (2 Python + 2 TS)', async () => {
-    const warnSpy = vi.spyOn(logger, 'warn');
-
+  it('probes both TypeScript and Python members concurrently in a mixed cluster (2 Python + 2 TS)', async () => {
     const table = await new ProbeService().probe(
       [
         { id: 'ts-1', body: 'function a(x) { return x + 1; }', isPure: true, language: 'ts' },
@@ -303,19 +300,35 @@ describe('ProbeService.probe — real execution', () => {
     expect(table).toBeDefined();
     expect(table!.executed).toBe(true);
 
-    // TypeScript is chosen on tie (2 vs 2): only TS members are in the output table
+
     const executedIds = table!.rows[0].results.map((r) => r.functionId);
-    expect(executedIds.sort()).toEqual(['ts-1', 'ts-2']);
+    expect(executedIds.sort()).toEqual(['py-1', 'py-2', 'ts-1', 'ts-2']);
+    expect(table!.rows[0].diverged).toBe(false);
+    expect(table!.rows[0].results.map((r) => r.output)).toEqual(['6', '6', '6', '6']);
+    expect(table!.skipped).toBeUndefined();
+  });
 
-    // Assert that the dropped Python members are reported as unusable rather than silently dropped
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('probe could not materialise py-1: skipped: cluster probed as typescript')
-    );
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('probe could not materialise py-2: skipped: cluster probed as typescript')
+  it('records skipped members with reasons in a mixed cluster with impure or unsupported members', async () => {
+    const table = await new ProbeService().probe(
+      [
+        { id: 'ts-1', body: 'function a(x) { return x + 1; }', isPure: true, language: 'ts' },
+        { id: 'py-1', body: 'def py1(x):\n    return x + 1', isPure: true, language: 'python' },
+        { id: 'ts-impure', body: 'function c(x) { console.log(x); return x; }', isPure: false, language: 'ts' },
+        { id: 'rb-1', body: 'def rb(x); x + 1; end', isPure: true, language: 'ruby' as never },
+      ],
+      ['[5]']
     );
 
-    warnSpy.mockRestore();
+    expect(table).toBeDefined();
+    expect(table!.executed).toBe(true);
+
+    const executedIds = table!.rows[0].results.map((r) => r.functionId);
+    expect(executedIds.sort()).toEqual(['py-1', 'ts-1']);
+
+    expect(table!.skipped).toEqual([
+      { functionId: 'ts-impure', reason: 'impure' },
+      { functionId: 'rb-1', reason: 'unsupported-language' },
+    ]);
   });
 
   it('does not produce a false agreement row when members return unserializable values', async () => {
