@@ -11,14 +11,16 @@ import type { RepoIdParams } from '../Validators/repo.validator.js';
  * response. No try/catch — asyncHandler forwards rejections to the error
  * middleware.
  */
-const intelligenceService = new IntelligenceService();
+let intelligenceService: IntelligenceService | null = null;
 
 export const listRepos = async (_req: Request, res: Response): Promise<void> => {
+  intelligenceService ??= new IntelligenceService();
   const repos = await intelligenceService.listRepos();
   sendSuccess(res, { data: repos, message: 'Repos fetched' });
 };
 
 export const getRepo = async (req: Request, res: Response): Promise<void> => {
+  intelligenceService ??= new IntelligenceService();
   const { repoId } = req.params as unknown as RepoIdParams;
   const detail = await intelligenceService.getRepoDetail(repoId);
   sendSuccess(res, { data: detail, message: 'Repo fetched' });

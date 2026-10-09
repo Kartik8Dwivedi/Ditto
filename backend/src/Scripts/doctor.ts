@@ -45,7 +45,7 @@ const runChecks = async (): Promise<DoctorCheck[]> => {
     ok: true,
     detail: configured.length > 0 
       ? `valid (${configured.join(', ')} present)` 
-      : 'valid (no optional vars set)',
+      : 'valid (no optional vars set - server and pipeline will not start)',
   });
 
   // MongoDB check
