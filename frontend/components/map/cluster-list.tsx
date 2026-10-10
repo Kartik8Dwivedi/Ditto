@@ -8,21 +8,40 @@ import { useClusterDrawer } from '@/stores/cluster.store';
 import { Badge } from '@/components/ui/badge';
 import { ClusterDrawer } from '@/components/cluster/cluster-drawer';
 import { sortByRisk } from '@/lib/mocks/derive';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ClusterToolbar, SortOption } from './cluster-toolbar';
 
-function ClusterRow({ cluster, index }: { cluster: ClusterSummary; index: number }) {
+function ClusterRow({
+  cluster,
+  index,
+  tabIndex,
+  onKeyDown,
+  onFocus,
+  buttonRef,
+}: {
+  cluster: ClusterSummary;
+  index: number;
+  tabIndex: number;
+  onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => void;
+  onFocus: () => void;
+  buttonRef: (el: HTMLButtonElement | null) => void;
+}) {
   const openCluster = useClusterDrawer((s) => s.openCluster);
   const verdict = verdictFor(cluster);
   const soft = !verdict.isHardClaim;
 
   return (
     <button
+      ref={buttonRef}
+      id={`cluster-row-${cluster.id}`}
+      tabIndex={tabIndex}
+      onKeyDown={(e) => onKeyDown(e, index)}
+      onFocus={onFocus}
       type="button"
       onClick={() => openCluster(cluster.id)}
       style={{ animationDelay: `${Math.min(index * 28, 340)}ms` }}
       className={cn(
-        'animate-rise group flex w-full items-center gap-3 px-4 py-2.5 text-left',
+        'animate-rise group flex w-full items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-offset-[-2px]',
         'transition-colors duration-150 hover:bg-inset',
         'not-last:border-b not-last:border-line/70',
         // A finding we are not confident about looks like a lead, not a claim.
@@ -89,6 +108,8 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
   const [selectedVerdict, setSelectedVerdict] = useState<string>('all');
   const [provenOnly, setProvenOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('risk');
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const visibleClusters = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -119,7 +140,32 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
     }
     return sortByRisk(filtered);
   }, [clusters, search, selectedVerdict, provenOnly, sortBy]);
-    
+
+  const safeFocusedIndex = Math.min(focusedIndex, Math.max(0, visibleClusters.length - 1));
+
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextIndex = Math.min(index + 1, visibleClusters.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextIndex = Math.max(index - 1, 0);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      nextIndex = 0;
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      nextIndex = visibleClusters.length - 1;
+    }
+
+    if (nextIndex !== null && nextIndex !== index) {
+      setFocusedIndex(nextIndex);
+      rowRefs.current[nextIndex]?.focus();
+    }
+  };
+
   if (clusters.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-10 text-center">
@@ -146,7 +192,7 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
          totalCount={clusters.length}
          filteredCount={visibleClusters.length}
       />
-       
+
       <div className="overflow-hidden rounded-lg border border-line bg-panel">
         <header className="flex items-center gap-3 border-b border-line bg-inset/60 px-4 py-1.5">
           <span aria-hidden className="size-1.5 shrink-0" />
@@ -170,7 +216,17 @@ export function ClusterList({ clusters }: { clusters: ClusterSummary[] }) {
 
         {visibleClusters.length > 0 ? (
           visibleClusters.map((cluster, index) => (
-            <ClusterRow key={cluster.id} cluster={cluster} index={index} />
+            <ClusterRow
+              key={cluster.id}
+              cluster={cluster}
+              index={index}
+              tabIndex={safeFocusedIndex === index ? 0 : -1}
+              onKeyDown={handleRowKeyDown}
+              onFocus={() => setFocusedIndex(index)}
+              buttonRef={(el) => {
+                rowRefs.current[index] = el;
+              }}
+            />
           ))
         ) : (
           <div className="px-4 py-10 text-center">

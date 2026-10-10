@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RotateCw, Scissors, TriangleAlert, X } from 'lucide-react';
 import type { ClusterDetail } from '@/types/ditto';
 import { cn } from '@/lib/utils';
@@ -12,21 +12,81 @@ import { ConfidenceMeter } from './confidence-meter';
 import { DivergenceTable } from './divergence-table';
 import { ImplementationCard } from './implementation-card';
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function ClusterDrawer() {
   const clusterId = useClusterDrawer((s) => s.openClusterId);
   const close = useClusterDrawer((s) => s.closeCluster);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!clusterId) return;
+
+    triggerRef.current =
+      (document.activeElement as HTMLElement) || document.getElementById(`cluster-row-${clusterId}`);
+
+    const frame = requestAnimationFrame(() => {
+      if (!dialogRef.current) return;
+      const focusables = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusables.length > 0) {
+        focusables[0].focus();
+      } else {
+        dialogRef.current.focus();
+      }
+    });
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!dialogRef.current) return;
+
+        const focusables = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+        ).filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+
+        if (focusables.length === 0) {
+          e.preventDefault();
+          dialogRef.current.focus();
+          return;
+        }
+
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !dialogRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !dialogRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     };
+
     window.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
+
+      const target =
+        (triggerRef.current && document.contains(triggerRef.current) ? triggerRef.current : null) ||
+        document.getElementById(`cluster-row-${clusterId}`);
+      target?.focus();
     };
   }, [clusterId, close]);
 
@@ -36,19 +96,22 @@ export function ClusterDrawer() {
     <div className="fixed inset-0 z-40 flex justify-end">
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close cluster detail"
         onClick={close}
         className="animate-fade-in absolute inset-0 cursor-default bg-black/60 backdrop-blur-[2px]"
       />
 
       <aside
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-label="Cluster detail"
         className={cn(
           // Wide enough that a ~80-char implementation line fits in a
           // two-column grid at 1440px without clipping mid-token.
-          'animate-drawer-in relative flex h-full w-[min(1240px,95vw)] flex-col',
+          'animate-drawer-in relative flex h-full w-[min(1240px,95vw)] flex-col outline-none',
           'border-l border-line-strong bg-canvas shadow-2xl shadow-black/50',
         )}
       >
@@ -121,7 +184,7 @@ function CloseButton({ onClose }: { onClose: () => void }) {
       type="button"
       onClick={onClose}
       aria-label="Close"
-      className="rounded p-1 text-ink-subtle transition-colors duration-150 hover:bg-inset hover:text-ink"
+      className="rounded p-1 text-ink-subtle transition-colors duration-150 hover:bg-inset hover:text-ink focus-visible:outline-offset-2"
     >
       <X className="size-4" />
     </button>
