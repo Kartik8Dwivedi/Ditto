@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import { connectToDB, disconnectFromDB } from '../Config/db.js';
 import OpenAIService from '../Services/openai.service.js';
 import logger from '../Config/logger.js';
+import AppConfig from '../Config/AppConfig.js';
 
 /**
  * `npm run doctor`
