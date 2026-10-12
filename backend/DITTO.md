@@ -112,5 +112,6 @@ npx tsx src/Scripts/verify-pipeline.ts           # full pipeline vs fixture, LLM
 
 `.env` (see `.sample.env`): `OPENAI_API_KEY` (required), `MONGO_URI` (required),
 `OPENAI_MODEL_CHEAP`, `OPENAI_MODEL_FLAGSHIP`, `EMBEDDING_MODEL`, `GITHUB_TOKEN`
-(optional, raises the indexer's GitHub rate limit). Only `Config/AppConfig.ts`
-reads `process.env`.
+(optional, raises the indexer's GitHub rate limit), `CLUSTER_CROSS_LANGUAGE`
+(`allow` | `deny`, default `allow` — controls cross-language cluster pairing).
+Only `Config/AppConfig.ts` reads `process.env`.

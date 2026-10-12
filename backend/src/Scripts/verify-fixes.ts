@@ -97,6 +97,7 @@ const main = async (): Promise<void> => {
         isPure: fn.isPure,
         inputs: fn.fingerprint!.inputs,
         outputs: fn.fingerprint!.outputs,
+        language: fn.language,
       }));
 
     const candidates = findCandidateClusters(clusterable);

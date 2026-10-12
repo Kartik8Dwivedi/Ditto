@@ -138,6 +138,13 @@ export const AdjudicationSchema = z.object({
 
 export type Adjudication = z.infer<typeof AdjudicationSchema>;
 
+export type DivergenceSkippedReason = 'impure' | 'unsupported-language' | 'unusable';
+
+export interface DivergenceSkippedMember {
+  functionId: string;
+  reason: DivergenceSkippedReason;
+}
+
 /**
  * The result of running cluster members on the same inputs.
  *
@@ -151,6 +158,7 @@ export type DivergenceTable = {
     results: Array<{ functionId: string; output: string; error?: string }>;
     diverged: boolean;
   }>;
+  skipped?: DivergenceSkippedMember[];
 };
 
 export type Cluster = {
@@ -206,6 +214,7 @@ export type RepoStats = {
   suppressedClusters?: number;
   /** The confidence threshold used for determining semantic duplicate clusters */
   confidenceThreshold: number;
+  crossLanguageClusters: number
 };
 
 /* ------------------------------------------------------------------ *
@@ -283,6 +292,7 @@ export type ClusterSummary = {
   disagreementRisk: DisagreementRisk;
   hasProvenDivergence: boolean;
   linesRemovable: number;
+  languages: Array<'ts' | 'python'>;
   /** True if the entire cluster is marked intentional in .dittoignore */
   isSuppressed?: boolean;
   suppressionReason?: string;

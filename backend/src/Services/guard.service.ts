@@ -10,6 +10,7 @@ import logger from '../Config/logger.js';
 import { NotFoundError, ConflictError } from '../Utils/errors/AppError.js';
 import type { ExtractedFunction, GuardResult, IFunction } from '../Models/index.js';
 import type { HydratedDocument } from 'mongoose';
+import AppConfig from '../Config/AppConfig.js';
 
 /**
  * DITTO GUARD — the map finds the debt, the check stops you adding to it.
@@ -162,6 +163,7 @@ class GuardService {
         isPure: fn.isPure,
         inputs: fingerprint.inputs,
         outputs: fingerprint.outputs,
+        language: fn.language,
       };
 
       const best = findBestMatch(probe, index);
@@ -259,6 +261,7 @@ const toClusterable = (doc: HydratedDocument<IFunction>): ClusterableFunction =>
   inputs: doc.fingerprint?.inputs ?? [],
   outputs: doc.fingerprint?.outputs ?? [],
   file: doc.file,
+  language: (doc.language as 'ts' | 'python') ?? 'ts'
 });
 
 /**
@@ -268,11 +271,12 @@ const toClusterable = (doc: HydratedDocument<IFunction>): ClusterableFunction =>
  */
 const findBestMatch = (
   probe: ClusterableFunction,
-  index: ClusterableFunction[]
+  index: ClusterableFunction[],
+  options: { crossLanguage?: 'allow' | 'deny' } = { crossLanguage: AppConfig.CLUSTER_CROSS_LANGUAGE }
 ): { id: string; similarity: number } | null => {
   let best: { id: string; similarity: number } | null = null;
   for (const candidate of index) {
-    if (!isCompatible(probe, candidate)) continue;
+    if (!isCompatible(probe, candidate, options)) continue;
     const similarity = cosineSimilarity(probe.embedding, candidate.embedding);
     if (!best || similarity > best.similarity) best = { id: candidate.id, similarity };
   }
