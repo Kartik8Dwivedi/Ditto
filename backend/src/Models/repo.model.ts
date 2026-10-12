@@ -41,6 +41,7 @@ const statsSchema = new mongoose.Schema<RepoStats>(
     functionsAnalyzed: { type: Number, default: 0 },
     functionsTotal: { type: Number, default: 0 },
     suppressedClusters: { type: Number, default: 0 },
+    confidenceThreshold: { type: Number, default: 0.75 },
   },
   { _id: false }
 );

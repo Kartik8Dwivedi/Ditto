@@ -73,14 +73,20 @@ export function flaggedResultIds(row: DivergenceRow, canonicalId: string | undef
   return flagged;
 }
 
-export function DivergenceTable({ cluster }: { cluster: ClusterDetail }) {
+export function DivergenceTable({
+  cluster,
+  threshold,
+}: {
+  cluster: ClusterDetail;
+  threshold?: number;
+}) {
   const { divergence, members } = cluster;
   if (!divergence || divergence.rows.length === 0) return null;
 
   const executed = divergence.executed;
   const canonicalId = members.find((m) => m.isCanonical)?.id;
   // Only a proven, confident, semantic disagreement is allowed to scream red.
-  const hot = isProvenConflict(cluster, executed);
+  const hot = isProvenConflict(cluster, executed, threshold);
 
   const divergedCount = divergence.rows.filter((r) => r.diverged).length;
 
@@ -214,7 +220,7 @@ export function DivergenceTable({ cluster }: { cluster: ClusterDetail }) {
                           hot ? 'text-danger' : 'text-warn',
                         )}
                       >
-                        {rowVerdictLabel(cluster, executed)}
+                        {rowVerdictLabel(cluster, executed, threshold)}
                       </span>
                     ) : (
                       <span className="text-[11px] text-success/70">✓</span>

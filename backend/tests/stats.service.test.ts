@@ -189,4 +189,9 @@ describe('computeRepoStats', () => {
     expect(stats.callSitesUnifiable).toBe(0);
     expect(stats.suspectedReinvented).toBe(0);
   });
+
+  it('stamps the confidence threshold used by isConfirmed', () => {
+    const stats = computeRepoStats(functions, [confirmed]);
+    expect(stats.confidenceThreshold).toBe(CONFIDENCE_THRESHOLD);
+  });
 });

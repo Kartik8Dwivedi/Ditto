@@ -98,7 +98,7 @@ export default async function RepoPage(props: PageProps<'/repo/[repoId]'>) {
                 Sorted by risk · Click row for verification proof
               </p>
             </div>
-            <ClusterList clusters={clusters} />
+            <ClusterList clusters={clusters} threshold={stats.confidenceThreshold} />
           </section>
         </main>
       </div>

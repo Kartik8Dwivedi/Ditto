@@ -19,13 +19,13 @@ import logger from '../Config/logger.js';
  */
 
 const main = async (): Promise<void> => {
-  const slug = process.argv[2] 
-  
+  const slug = process.argv[2];
+
   if (!slug) {
     throw new Error(`Missing <owner>/<repo>.`);
   }
-  
-  const [owner,name, ...rest] = slug.split('/');
+
+  const [owner, name, ...rest] = slug.split('/');
   if (!owner || !name || rest.length > 0) {
     throw new Error(`"${slug}" is not <owner>/<repo>.`);
   }
@@ -61,6 +61,7 @@ const main = async (): Promise<void> => {
 
     logger.success(`recomputed stats for ${slug} @ ${repo.commit.slice(0, 7)} (0 tokens)`);
     console.log(`\n  HEALTH SCORE ............... ${stats.healthScore}/100`);
+    console.log(`  confidence threshold ....... ${stats.confidenceThreshold}`);
     console.log(`  semantic duplicate clusters  ${stats.semanticDuplicateClusters}`);
     console.log(`  behavioural conflicts ...... ${stats.behavioralConflicts}`);
     console.log(`  near-duplicates ............ ${stats.nearDuplicates}`);

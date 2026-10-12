@@ -209,5 +209,6 @@ export const computeRepoStats = (
     functionsAnalyzed: functions.length,
     functionsTotal: functionsTotal ?? functions.length,
     suppressedClusters,
+    confidenceThreshold: CONFIDENCE_THRESHOLD,
   };
 };
