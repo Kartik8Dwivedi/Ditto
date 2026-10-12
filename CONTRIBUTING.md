@@ -46,7 +46,7 @@ section. The short version:
 # backend
 cd backend && npm install
 npm run typecheck      # must pass
-npm test               # must pass (194 tests)
+npm test               # must pass (331 tests)
 
 # frontend
 cd frontend && npm install
