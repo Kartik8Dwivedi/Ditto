@@ -377,7 +377,8 @@ class ProbeService {
     // THE GATE. Impure functions have database calls, network, and dependencies:
     // executing them is both meaningless and a security hole.
     const skipped: DivergenceSkippedMember[] = [];
-    const pureSupportedMembers: ProbeMember[] = [];
+    const pureTs: ProbeMember[] = [];
+    const purePy: ProbeMember[] = [];
 
     for (const member of members) {
       if (!member.isPure) {
@@ -385,59 +386,65 @@ class ProbeService {
         continue;
       }
       const language = member.language ?? 'ts';
-      if (!['ts', 'python'].includes(language)) {
+      if (language === 'ts') {
+        pureTs.push(member);
+      } else if (language === 'python') {
+        purePy.push(member);
+      } else {
         skipped.push({ functionId: member.id, reason: 'unsupported-language' });
-        continue;
       }
-      pureSupportedMembers.push(member);
     }
 
-    if (pureSupportedMembers.length < 2) {
+    if (pureTs.length < 2 && purePy.length < 2) {
       logger.info(
-        `probe skipped: ${pureSupportedMembers.length} of ${members.length} members are pure and supported, need at least 2 of either`
+        `probe skipped: ${pureTs.length} pure TS and ${purePy.length} pure Python members, need at least 2 of either`
       );
       return undefined;
     }
-
     if (probeInputs.length === 0) {
       logger.info('probe skipped: adjudicator supplied no probe inputs');
       return undefined;
     }
-    
-    const pureTs = pureSupportedMembers.filter((member) => member.isPure && (member.language ?? 'ts') === 'ts');
-    const purePy = pureSupportedMembers.filter((m) => m.isPure && m.language === 'python');
 
-    const allCells: ProbeCell[] = [];
-    const unusableEntries: Array<{ functionId: string; reason: string }> = [];
+    let result: WorkerResult;
     try {
-      const runs: Promise<WorkerResult>[] = [];
-      if (pureTs.length > 0) runs.push(this.runWorker(pureTs, probeInputs));
-      if (purePy.length > 0) runs.push(this.pyRunner.run(purePy, probeInputs));
-
-      const results = await Promise.all(runs);
-      for (const res of results) {
-        allCells.push(...res.cells);
-        unusableEntries.push(...res.unusable);
+      // Mixed-language dispatch policy (cross-language probing is deferred to #105):
+      // The majority language wins. In the event of a tie (e.g. 2 Python + 2 TS),
+      // TypeScript is prioritized as the primary host language.
+      // Members belonging to the unselected language cannot execute in the chosen
+      // sandbox and are recorded in `skipped` with `reason: 'unsupported-language'`
+      // so the table says plainly why they are absent.
+      const runPython = purePy.length >= 2 && purePy.length > pureTs.length;
+      if (runPython) {
+        for (const m of pureTs) {
+          skipped.push({ functionId: m.id, reason: 'unsupported-language' });
+        }
+        result = await this.pyRunner.run(purePy, probeInputs);
+      } else {
+        for (const m of purePy) {
+          skipped.push({ functionId: m.id, reason: 'unsupported-language' });
+        }
+        result = await this.runWorker(pureTs, probeInputs);
       }
     } catch (err) {
       logger.warn('probe sandbox failed — no divergence table:', err instanceof Error ? err.message : err);
       return undefined;
     }
 
-    for (const entry of unusableEntries) {
+    for (const entry of result.unusable) {
       logger.warn(`probe could not materialise ${entry.functionId}: ${entry.reason} — excluded`);
       skipped.push({ functionId: entry.functionId, reason: 'unusable' });
     }
 
     // Excluding unusable members can drop us below two, at which point there is
     // nothing to compare and therefore nothing to claim.
-    const executedIds = new Set(allCells.map((cell) => cell.functionId));
+    const executedIds = new Set(result.cells.map((cell) => cell.functionId));
     if (executedIds.size < 2) {
       logger.info(`probe produced ${executedIds.size} usable members — no divergence table`);
       return undefined;
     }
 
-    const rows = buildRows(allCells);
+    const rows = buildRows(result.cells);
 
     // Every input may have had fewer than two cells (e.g. one member was
     // unusable per-input). If no row survived the comparability filter there is

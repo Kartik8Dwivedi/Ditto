@@ -286,7 +286,7 @@ describe('ProbeService.probe — real execution', () => {
     expect(table!.rows[0].diverged).toBe(true);
   });
   
-  it('probes both TypeScript and Python members concurrently in a mixed cluster (2 Python + 2 TS)', async () => {
+  it('probes majority language and reports unselected members in skipped (2 Python + 2 TS)', async () => {
     const table = await new ProbeService().probe(
       [
         { id: 'ts-1', body: 'function a(x) { return x + 1; }', isPure: true, language: 'ts' },
@@ -300,18 +300,23 @@ describe('ProbeService.probe — real execution', () => {
     expect(table).toBeDefined();
     expect(table!.executed).toBe(true);
 
-
+    // TypeScript is chosen on tie (2 vs 2): only TS members are in the output table
     const executedIds = table!.rows[0].results.map((r) => r.functionId);
-    expect(executedIds.sort()).toEqual(['py-1', 'py-2', 'ts-1', 'ts-2']);
+    expect(executedIds.sort()).toEqual(['ts-1', 'ts-2']);
     expect(table!.rows[0].diverged).toBe(false);
-    expect(table!.rows[0].results.map((r) => r.output)).toEqual(['6', '6', '6', '6']);
-    expect(table!.skipped).toBeUndefined();
+
+    // Python members are recorded in skipped with 'unsupported-language'
+    expect(table!.skipped).toEqual([
+      { functionId: 'py-1', reason: 'unsupported-language' },
+      { functionId: 'py-2', reason: 'unsupported-language' },
+    ]);
   });
 
   it('records skipped members with reasons in a mixed cluster with impure or unsupported members', async () => {
     const table = await new ProbeService().probe(
       [
         { id: 'ts-1', body: 'function a(x) { return x + 1; }', isPure: true, language: 'ts' },
+        { id: 'ts-2', body: 'function b(x) { return x + 1; }', isPure: true, language: 'ts' },
         { id: 'py-1', body: 'def py1(x):\n    return x + 1', isPure: true, language: 'python' },
         { id: 'ts-impure', body: 'function c(x) { console.log(x); return x; }', isPure: false, language: 'ts' },
         { id: 'rb-1', body: 'def rb(x); x + 1; end', isPure: true, language: 'ruby' as never },
@@ -323,12 +328,38 @@ describe('ProbeService.probe — real execution', () => {
     expect(table!.executed).toBe(true);
 
     const executedIds = table!.rows[0].results.map((r) => r.functionId);
-    expect(executedIds.sort()).toEqual(['py-1', 'ts-1']);
+    expect(executedIds.sort()).toEqual(['ts-1', 'ts-2']);
 
     expect(table!.skipped).toEqual([
       { functionId: 'ts-impure', reason: 'impure' },
       { functionId: 'rb-1', reason: 'unsupported-language' },
+      { functionId: 'py-1', reason: 'unsupported-language' },
     ]);
+  });
+
+  it('never produces a divergence table row containing cells from both languages in a mixed cluster', async () => {
+    const members: ProbeMember[] = [
+      { id: 'ts-1', body: 'function a(x) { return x * 2; }', isPure: true, language: 'ts' },
+      { id: 'ts-2', body: 'function b(x) { return x * 2; }', isPure: true, language: 'ts' },
+      { id: 'py-1', body: 'def py1(x):\n    return x * 2', isPure: true, language: 'python' },
+      { id: 'py-2', body: 'def py2(x):\n    return x * 2', isPure: true, language: 'python' },
+    ];
+
+    const table = await new ProbeService().probe(members, ['[2]', '[3]']);
+
+    expect(table).toBeDefined();
+    expect(table!.executed).toBe(true);
+
+    const tsIds = new Set(['ts-1', 'ts-2']);
+    const pyIds = new Set(['py-1', 'py-2']);
+
+    for (const row of table!.rows) {
+      const rowIds = row.results.map((r) => r.functionId);
+      const hasTs = rowIds.some((id) => tsIds.has(id));
+      const hasPy = rowIds.some((id) => pyIds.has(id));
+      // Under no circumstances should a row execute cells from both TS and Python
+      expect(hasTs && hasPy).toBe(false);
+    }
   });
 
   it('does not produce a false agreement row when members return unserializable values', async () => {
