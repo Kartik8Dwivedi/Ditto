@@ -1,8 +1,8 @@
-import type { ClusterMember } from "@/types/ditto";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { CodeBlock } from "@/components/ui/code-block";
-import { CopySourceButton } from "./copy-source-button";
+import type { ClusterMember } from '@/types/ditto';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { CodeBlock } from '@/components/ui/code-block';
+import { CopySourceButton } from './copy-source-button';
 
 /**
  * One implementation, side by side with its siblings. The whole point is that
@@ -19,19 +19,15 @@ export function ImplementationCard({
   return (
     <article
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-lg border bg-panel",
-        member.isCanonical ? "border-accent-line" : "border-line",
+        'flex min-w-0 flex-col overflow-hidden rounded-lg border bg-panel',
+        member.isCanonical ? 'border-accent-line' : 'border-line',
         className,
       )}
     >
       <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <h4 className="truncate font-mono text-[13px] font-semibold text-ink">
-            {member.name}
-          </h4>
-          <Badge tone="neutral">
-            {member.language === "python" ? "py" : "ts"}
-          </Badge>
+          <h4 className="truncate font-mono text-[13px] font-semibold text-ink">{member.name}</h4>
+          <Badge tone="neutral">{member.language === 'python' ? 'py' : 'ts'}</Badge>
           {member.isCanonical && <Badge tone="accent">Canonical</Badge>}
           {member.isPure && (
             <Badge
@@ -42,19 +38,13 @@ export function ImplementationCard({
             </Badge>
           )}
           {!member.isPure && (
-            <Badge
-              tone="neutral"
-              title="Has side effects — Ditto will not execute it."
-            >
+            <Badge tone="neutral" title="Has side effects — Ditto will not execute it.">
               Impure
             </Badge>
           )}
         </div>
-
         <div className="flex shrink-0 items-center gap-2">
-          <span className="tnum shrink-0 font-mono text-[11px] text-ink-subtle">
-            {member.loc} loc
-          </span>
+          <span className="tnum font-mono text-[11px] text-ink-subtle">{member.loc} loc</span>
           <CopySourceButton source={member.body} />
         </div>
       </header>
@@ -64,11 +54,7 @@ export function ImplementationCard({
         <span className="text-ink-subtle">:{member.startLine}</span>
       </p>
 
-      <CodeBlock
-        code={member.body}
-        startLine={member.startLine}
-        className="flex-1"
-      />
+      <CodeBlock code={member.body} startLine={member.startLine} className="flex-1" />
     </article>
   );
 }
