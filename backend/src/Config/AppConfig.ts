@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+import { parseCorsOrigin } from './cors.js';
 import logger from './logger.js';
 import RateLimiter from './rateLimiter.js';
 
@@ -15,8 +16,29 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
   MONGO_URI: z.string().min(1).optional(),
-  // Comma-separated list of allowed CORS origins; "*" allows all.
-  CORS_ORIGIN: z.string().default('*'),
+  // Comma-separated list of allowed CORS origins, or "*" to allow all.
+  // Empty values fail fast. A list containing "*" widens to allow all,
+  // warning if any accompanying origins are ignored.
+  CORS_ORIGIN: z
+    .string()
+    .default('*')
+    .transform((val, ctx) => {
+      try {
+        return parseCorsOrigin(val, {
+          onWarnIgnoredOrigins: (ignored) => {
+            logger.warn(
+              `CORS_ORIGIN contains '*' alongside other entries; widening to allow all origins and ignoring: ${ignored.join(', ')}`
+            );
+          },
+        });
+      } catch (err) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: err instanceof Error ? err.message : 'Invalid CORS_ORIGIN value',
+        });
+        return z.NEVER;
+      }
+    }),
 
   OPENAI_API_KEY: z.string().min(1).optional(),
   // Model ids move faster than any codebase. They live here, never in service
@@ -122,7 +144,7 @@ const AppConfig = Object.freeze({
   IS_PRODUCTION: env.NODE_ENV === 'production',
   PORT: env.PORT,
   MONGO_URI: env.MONGO_URI,
-  CORS_ORIGIN: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+  CORS_ORIGIN: env.CORS_ORIGIN,
   OPENAI_API_KEY: env.OPENAI_API_KEY,
   OPENAI_MODEL_CHEAP: env.OPENAI_MODEL_CHEAP,
   OPENAI_MODEL_FLAGSHIP: env.OPENAI_MODEL_FLAGSHIP,
@@ -152,6 +174,7 @@ const AppConfig = Object.freeze({
   CLUSTER_CROSS_LANGUAGE: env.CLUSTER_CROSS_LANGUAGE
 });
 
+export { parseCorsOrigin };
 export type AppConfigType = typeof AppConfig;
 
 export default AppConfig;

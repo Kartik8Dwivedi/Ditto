@@ -261,7 +261,7 @@ cp .sample.env .env
 | `MONGO_URI` | **yes** | Where results are written and read from. |
 | `OPENAI_API_KEY` | **yes** | Used by the pipeline, by Ditto Guard, and by on-demand analysis. The read endpoints that serve the map never call a model — the server validates both at boot and fails immediately with a readable message if either is missing. |
 | `PORT` | no | Defaults to `3001`. Cloud Run injects its own. |
-| `CORS_ORIGIN` | no | Comma-separated origins, or `*`. |
+| `CORS_ORIGIN` | no | Allowed origins or `*`. Empty values fail; lists containing `*` widen to `*` (logs warning). Default `*`. |
 | `OPENAI_MODEL_CHEAP` | no | Fingerprints, one call per function. Default `gpt-5.4-nano`. |
 | `OPENAI_MODEL_FLAGSHIP` | no | Adjudication, one call per cluster. Default `gpt-5.6-terra`. |
 | `EMBEDDING_MODEL` | no | Default `text-embedding-3-small`. |
