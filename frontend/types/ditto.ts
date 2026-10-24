@@ -43,6 +43,7 @@ export type RepoStats = {
   functionsAnalyzed: number;
   /** The confidence threshold used by the backend to determine semantic duplicates */
   confidenceThreshold?: number;
+  crossLanguageClusters?: number;
 };
 
 /**
@@ -63,6 +64,7 @@ export type ClusterSummary = {
   disagreementRisk: DisagreementRisk;
   hasProvenDivergence: boolean;
   linesRemovable: number;
+  languages?: Array<'ts' | 'python'>;
 };
 
 export type ClusterMember = {
@@ -85,6 +87,13 @@ export type ClusterMember = {
   origin?: 'baseline' | 'pr';
 };
 
+export type DivergenceSkippedReason = 'impure' | 'unsupported-language' | 'unusable';
+
+export interface DivergenceSkippedMember {
+  functionId: string;
+  reason: DivergenceSkippedReason;
+}
+
 export type DivergenceResult = {
   functionId: string;
   output: string;
@@ -105,6 +114,7 @@ export type Divergence = {
    */
   executed: boolean;
   rows: DivergenceRow[];
+  skipped?: DivergenceSkippedMember[];
 };
 
 export type ClusterDetail = ClusterSummary & {
