@@ -1,7 +1,7 @@
 'use client';
 
 import { TriangleAlert } from 'lucide-react';
-import type { ClusterDetail, DivergenceRow } from '@/types/ditto';
+import type { ClusterDetail, ClusterMember, DivergenceRow, DivergenceSkippedReason } from '@/types/ditto';
 import { cn } from '@/lib/utils';
 import { isProvenConflict, rowVerdictLabel } from '@/lib/cluster-verdict';
 import { TruthBadge } from './truth-badge';
@@ -72,6 +72,22 @@ export function flaggedResultIds(row: DivergenceRow, canonicalId: string | undef
   }
   return flagged;
 }
+
+export function formatSkippedReason(reason: DivergenceSkippedReason, member?: ClusterMember): string {
+  switch (reason) {
+    case 'unsupported-language':
+      return member?.language === 'python'
+        ? 'Python execution not supported yet'
+        : 'Language execution not supported yet';
+    case 'impure':
+      return 'Impure function (has side effects)';
+    case 'unusable':
+      return 'Function could not be executed in sandbox';
+    default:
+      return reason;
+  }
+}
+
 
 export function DivergenceTable({
   cluster,
@@ -232,6 +248,25 @@ export function DivergenceTable({
           </tbody>
         </table>
       </div>
+      {divergence.skipped && divergence.skipped.length > 0 && (
+        <footer className="border-t border-line bg-inset/40 px-4 py-2.5 font-mono text-[11px] text-ink-muted">
+          <ul className="flex flex-col gap-1">
+            {divergence.skipped.map((skip) => {
+              const member = members.find((m) => m.id === skip.functionId);
+              const label = member ? basename(member.file) : skip.functionId;
+              const reasonText = formatSkippedReason(skip.reason, member);
+
+              return (
+                <li key={skip.functionId} className="flex items-center gap-1.5">
+                  <span className="font-semibold text-ink-subtle">{label}</span>
+                  <span>not executed:</span>
+                  <span>{reasonText}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </footer>
+      )}
     </section>
   );
 }

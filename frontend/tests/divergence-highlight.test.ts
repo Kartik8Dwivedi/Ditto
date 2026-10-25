@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { flaggedResultIds } from '@/components/cluster/divergence-table';
+import { flaggedResultIds, formatSkippedReason } from '@/components/cluster/divergence-table';
 import type { DivergenceRow } from '@/types/ditto';
 
 const divergenceRow = (overrides: Partial<DivergenceRow> = {}): DivergenceRow => ({
@@ -93,3 +93,33 @@ describe('flaggedResultIds divergence highlighting', () => {
     expect(flaggedResultIds(row, canonicalId)).toEqual(new Set(expected));
   });
 });
+
+describe('formatSkippedReason', () => {
+  const pyMember = {
+    id: 'fn_py',
+    name: 'helper',
+    file: 'helpers/utils.py',
+    startLine: 1,
+    endLine: 10,
+    loc: 10,
+    isPure: true,
+    isCanonical: false,
+    language: 'python' as const,
+    body: 'def helper(): pass',
+  };
+
+  it('formats unsupported-language reason specifically for python members', () => {
+    expect(formatSkippedReason('unsupported-language', pyMember)).toBe(
+      'Python execution not supported yet'
+    );
+  });
+
+  it('formats impure reason correctly', () => {
+    expect(formatSkippedReason('impure')).toBe('Impure function (has side effects)');
+  });
+
+  it('formats unusable sandbox reason correctly', () => {
+    expect(formatSkippedReason('unusable')).toBe('Function could not be executed in sandbox');
+  });
+});
+

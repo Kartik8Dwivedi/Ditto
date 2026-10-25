@@ -31,6 +31,7 @@ function ClusterRow({
   const openCluster = useClusterDrawer((s) => s.openCluster);
   const verdict = verdictFor(cluster, threshold);
   const soft = !verdict.isHardClaim;
+  const languages = cluster.languages && cluster.languages.length > 0 ? cluster.languages : ['ts'];
 
   return (
     <button
@@ -78,7 +79,12 @@ function ClusterRow({
         {cluster.confidence.toFixed(2)}
       </span>
 
-      <span className="flex w-[236px] shrink-0 items-center justify-end gap-1.5">
+      <span className="flex w-[260px] shrink-0 items-center justify-end gap-1.5">
+        {languages.map((lang) => (
+            <Badge key={lang} tone="neutral">
+              {lang === 'python' ? 'py' : 'ts'}
+            </Badge>
+        ))}
         {/*
           No count here on purpose. PRD §4.2 asks for an "N disagree" badge, but
           ClusterSummary carries no field for how many members disagree — only
@@ -117,6 +123,7 @@ export function ClusterList({
   const [provenOnly, setProvenOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('risk');
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [crossLanguageOnly, setCrossLanguageOnly] = useState(false);
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const visibleClusters = useMemo(() => {
@@ -130,6 +137,11 @@ export function ClusterList({
       if (selectedVerdict !== 'all') {
         const verdict = verdictFor(cluster, threshold);
         if (verdict.label !== selectedVerdict) return false;
+      }
+      
+      if (crossLanguageOnly) {
+        const isCrossLang = (cluster.languages ?? []).length > 1;
+        if (!isCrossLang) return false;
       }
 
       if (query.length > 0) {
@@ -147,7 +159,7 @@ export function ClusterList({
       return filtered.sort((a, b) => b.memberCount - a.memberCount);
     }
     return sortByRisk(filtered);
-  }, [clusters, search, selectedVerdict, provenOnly, sortBy, threshold]);
+  }, [clusters, search, selectedVerdict, provenOnly, sortBy, threshold, crossLanguageOnly]);
 
   const safeFocusedIndex = Math.min(focusedIndex, Math.max(0, visibleClusters.length - 1));
 
@@ -199,6 +211,8 @@ export function ClusterList({
          onSortByChange={setSortBy}
          totalCount={clusters.length}
          filteredCount={visibleClusters.length}
+         crossLanguageOnly={crossLanguageOnly}
+         onCrossLanguageOnlyToggle={() => setCrossLanguageOnly((prev) => !prev)}
       />
 
       <div className="overflow-hidden rounded-lg border border-line bg-panel">

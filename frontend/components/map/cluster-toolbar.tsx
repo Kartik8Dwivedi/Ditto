@@ -25,6 +25,8 @@ interface ClusterToolbarProps {
   onSortByChange: (sort: SortOption) => void;
   totalCount: number;
   filteredCount: number;
+  crossLanguageOnly: boolean;
+  onCrossLanguageOnlyToggle: () => void;
 }
 
 export function ClusterToolbar({
@@ -38,8 +40,10 @@ export function ClusterToolbar({
   onSortByChange,
   totalCount,
   filteredCount,
+  crossLanguageOnly,
+  onCrossLanguageOnlyToggle,
 }: ClusterToolbarProps) {
-  const hasActiveFilters = search.trim() !== '' || selectedVerdict !== 'all' || provenOnly;
+  const hasActiveFilters = search.trim() !== '' || selectedVerdict !== 'all' || provenOnly || crossLanguageOnly;
 
   return (
     <div className="mb-3 flex flex-col gap-2.5">
@@ -47,7 +51,7 @@ export function ClusterToolbar({
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-1 items-center gap-2">
        
-          <div className="relative min-w-[220px] max-w-sm flex-1">
+          <div className="relative min-w-[160px] max-w-sm flex-1">
             <Search
               aria-hidden
               className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-ink-subtle"
@@ -78,7 +82,7 @@ export function ClusterToolbar({
             onClick={onProvenOnlyToggle}
             aria-pressed={provenOnly}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors  whitespace-nowrap',
               provenOnly
                 ? 'border-danger-line bg-danger-bg text-danger'
                 : 'border-line bg-panel text-ink-muted hover:border-line-strong hover:text-ink',
@@ -86,8 +90,23 @@ export function ClusterToolbar({
             title="Show only clusters with proven divergence in sandbox execution"
           >
             <TriangleAlert className="size-3" />
-            <span>They disagree only</span>
+            <span>They disagree <span className="hidden sm:inline">only</span></span>
           </button>
+          <button
+            type="button"
+            onClick={onCrossLanguageOnlyToggle}
+            aria-pressed={crossLanguageOnly}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors whitespace-nowrap',
+              crossLanguageOnly
+                ? 'border-accent-line bg-accent-bg text-accent'
+                : 'border-line bg-panel text-ink-muted hover:border-line-strong hover:text-ink',
+            )}
+            title="Show only clusters with members in multiple languages"
+          >
+            <span>Cross-language <span className="hidden sm:inline">only</span></span>
+          </button>
+
         </div>
 
        
@@ -145,6 +164,7 @@ export function ClusterToolbar({
             onClick={() => {
               onSearchChange('');
               onVerdictChange('all');
+              if (crossLanguageOnly) onCrossLanguageOnlyToggle();
               if (provenOnly) onProvenOnlyToggle();
             }}
             className="ml-auto text-[11px] text-ink-subtle underline decoration-line hover:text-ink"

@@ -47,6 +47,7 @@ export function toSummary(cluster: ClusterDetail): ClusterSummary {
     disagreementRisk: cluster.disagreementRisk,
     hasProvenDivergence: cluster.hasProvenDivergence,
     linesRemovable: cluster.linesRemovable,
+    languages: cluster.languages ?? Array.from(new Set(cluster.members?.map((m) => m.language ?? 'ts') ?? ['ts'])),
   };
 }
 
