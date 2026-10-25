@@ -138,12 +138,12 @@ npm start                 # run the compiled app (node dist/index.js)
 
 ## Environment variables
 
-| Variable      | Required | Default       | Description                             |
-| ------------- | -------- | ------------- | --------------------------------------- |
-| `NODE_ENV`    | no       | `development` | `development` \| `test` \| `production` |
-| `PORT`        | no       | `3001`        | HTTP port                               |
-| `MONGO_URI`   | **yes**  | —             | MongoDB connection string               |
-| `CORS_ORIGIN` | no       | `*`           | Comma-separated allowed origins, or `*` |
+| Variable      | Required | Default       | Description                                                                                     |
+| ------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| `NODE_ENV`    | no       | `development` | `development` \| `test` \| `production`                                                         |
+| `PORT`        | no       | `3001`        | HTTP port                                                                                       |
+| `MONGO_URI`   | **yes**  | —             | MongoDB connection string                                                                       |
+| `CORS_ORIGIN` | no       | `*`           | Allowed origins or `*`. Empty values fail; lists containing `*` widen to `*` (logs warning).    |
 
 Env vars are validated at startup (Zod) — the process exits with a clear message
 if anything is missing or invalid.
