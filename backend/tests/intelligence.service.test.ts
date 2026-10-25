@@ -93,4 +93,21 @@ describe('IntelligenceService.getRepoDetail', () => {
     expect(detail.clusters).toEqual([]);
     expect(findLocsByIds).toHaveBeenCalledWith([]);
   });
+
+  it('omits languages when the stored cluster has none, and keeps them when present', async () => {
+    const withLangs = { ...cluster('c1', ['f1', 'f2'], 'f1'), languages: ['ts', 'python'] as const };
+    const withoutLangs = cluster('c2', ['f3', 'f4'], 'f3');
+    const { service } = makeService({
+      clusters: [withLangs, withoutLangs],
+      locs: [
+        { _id: objectId('f1'), loc: 10 },
+        { _id: objectId('f2'), loc: 7 },
+        { _id: objectId('f3'), loc: 20 },
+        { _id: objectId('f4'), loc: 5 },
+      ],
+    });
+    const detail = await service.getRepoDetail('repo-1');
+    expect(detail.clusters[0].languages).toEqual(['ts', 'python']);
+    expect(detail.clusters[1].languages).toBeUndefined();
+  });
 });
