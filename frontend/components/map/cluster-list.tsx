@@ -3,6 +3,7 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 import type { ClusterSummary } from '@/types/ditto';
 import { cn } from '@/lib/utils';
+import { clusterLanguages } from '@/lib/cluster-languages';
 import { verdictFor } from '@/lib/cluster-verdict';
 import { useClusterDrawer } from '@/stores/cluster.store';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,7 @@ function ClusterRow({
   const openCluster = useClusterDrawer((s) => s.openCluster);
   const verdict = verdictFor(cluster, threshold);
   const soft = !verdict.isHardClaim;
-  const languages = cluster.languages && cluster.languages.length > 0 ? cluster.languages : ['ts'];
+  const languages = clusterLanguages(cluster);
 
   return (
     <button

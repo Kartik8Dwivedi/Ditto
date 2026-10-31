@@ -292,7 +292,7 @@ export type ClusterSummary = {
   disagreementRisk: DisagreementRisk;
   hasProvenDivergence: boolean;
   linesRemovable: number;
-  languages: Array<'ts' | 'python'>;
+  languages?: Array<'ts' | 'python'>;
   /** True if the entire cluster is marked intentional in .dittoignore */
   isSuppressed?: boolean;
   suppressionReason?: string;

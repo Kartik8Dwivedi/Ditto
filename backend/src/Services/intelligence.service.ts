@@ -66,7 +66,7 @@ const toClusterSummary = (
   linesRemovable: linesRemovableFor(cluster, locById),
   isSuppressed: Boolean(cluster.isSuppressed),
   ...(cluster.suppressionReason ? { suppressionReason: cluster.suppressionReason } : {}),
-  languages: cluster.languages ?? ['ts'],
+  ...(cluster.languages && cluster.languages.length > 0 ? { languages: cluster.languages } : {}),
 });
 
 class IntelligenceService {
