@@ -103,6 +103,13 @@ export interface CandidateCluster {
   languageCount?: number;
 }
 
+export interface ClusteringStats {
+  components: number;
+  largestComponent: number;
+  pairsComputed: number;
+  ms: number;
+}
+
 export interface ClusterOptions {
   /** Average-linkage merge threshold. */
   threshold?: number;
@@ -111,6 +118,7 @@ export interface ClusterOptions {
   maxClusterSize?: number;
   maxClusters?: number;
   crossLanguage?: 'allow' | 'deny';
+  onStats?: (stats: ClusteringStats) => void;
 }
 
 /**
@@ -145,6 +153,47 @@ const dot = (a: number[], b: number[]): number => {
   let sum = 0;
   for (let i = 0; i < a.length; i += 1) sum += a[i] * b[i];
   return sum;
+};
+
+interface PreparedFunction {
+  fn: ClusterableFunction;
+  arityBucket: number;
+  inputs: string[];
+  outputs: string[];
+}
+
+const prepareFunction = (fn: ClusterableFunction): PreparedFunction => ({
+  fn,
+  arityBucket: arityBucket(fn.arity),
+  inputs: fn.inputs.map(normaliseType),
+  outputs: fn.outputs.map(normaliseType),
+});
+
+const preparedTypesMatch = (left: string, right: string): boolean =>
+  WILDCARD_TYPES.has(left) || WILDCARD_TYPES.has(right) || left === right;
+
+const isPreparedCompatible = (
+  a: PreparedFunction,
+  b: PreparedFunction,
+  crossLanguage?: 'allow' | 'deny'
+): boolean => {
+  if (crossLanguage === 'deny' && a.fn.language !== b.fn.language) return false;
+  if (a.fn.isPure !== b.fn.isPure) return false;
+  if (a.arityBucket !== b.arityBucket) return false;
+
+  const outputsOverlap =
+    a.outputs.length === 0 ||
+    b.outputs.length === 0 ||
+    a.outputs.some((left) =>
+      b.outputs.some((right) => preparedTypesMatch(left, right))
+    );
+  if (!outputsOverlap) return false;
+
+  const shared = Math.min(a.inputs.length, b.inputs.length);
+  for (let i = 0; i < shared; i += 1) {
+    if (!preparedTypesMatch(a.inputs[i], b.inputs[i])) return false;
+  }
+  return true;
 };
 
 /** `string | null` and `String` are the same claim about shape. */
@@ -224,8 +273,9 @@ const meanPairwise = (members: number[], sim: (a: number, b: number) => number):
  * Incompatible pairs are held at -Infinity so a group can never absorb a member
  * of an incompatible shape (their mean collapses to -Infinity).
  *
- * O(k³) in the component size k, which is tiny — components only exist along
- * edges at or above `MERGE_FLOOR`.
+ * Performance optimization: pre-compute all pairwise similarities once, then use
+ * Lance-Williams incremental update formula to compute new group-pair scores per
+ * merge in O(groups) instead of O(k²). This replaces naive O(k³) recalculation.
  */
 const averageLinkage = (
   component: number[],
@@ -233,33 +283,39 @@ const averageLinkage = (
   threshold: number,
   maxSize: number
 ): number[][] => {
-  // Local dense sim table over the component's members.
   const n = component.length;
-  const base: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+
+  // Use Float64Array (1D flat layout) for cache locality and full double precision.
+  // base[i * n + j] = cosine similarity between component[i] and component[j].
+  const base = new Float64Array(n * n);
   for (let i = 0; i < n; i += 1) {
     for (let j = i + 1; j < n; j += 1) {
       const s = simOf(component[i], component[j]);
-      base[i][j] = s;
-      base[j][i] = s;
+      base[i * n + j] = s;
+      base[j * n + i] = s;
     }
   }
 
-  let groups: number[][] = component.map((_index, i) => [i]); // indices INTO component
-  // Mean similarity between two groups of local indices.
-  const groupSim = (a: number[], b: number[]): number => {
-    let total = 0;
-    for (const x of a) for (const y of b) total += base[x][y];
-    return total / (a.length * b.length);
-  };
+  // gs[si * n + sj] = current group-pair similarity, updated by Lance-Williams formula.
+  const gs = Float64Array.from(base);
+  
+  const members: number[][] = component.map((_c, i) => [i]);
+  
+  // order = list of living group IDs after merges. Sparse: [0, 1, 2, 5] after groups 3,4 merged.
+  const order: number[] = members.map((_m, i) => i);
 
   for (;;) {
     let bestI = -1;
     let bestJ = -1;
     let best = threshold;
-    for (let i = 0; i < groups.length; i += 1) {
-      for (let j = i + 1; j < groups.length; j += 1) {
-        if (groups[i].length + groups[j].length > maxSize) continue;
-        const s = groupSim(groups[i], groups[j]);
+
+    for (let i = 0; i < order.length; i += 1) {
+      const si = order[i];
+      for (let j = i + 1; j < order.length; j += 1) {
+        const sj = order[j];
+        if (members[si].length + members[sj].length > maxSize) continue;
+
+        const s = gs[si * n + sj];
         if (s >= best) {
           best = s;
           bestI = i;
@@ -267,15 +323,38 @@ const averageLinkage = (
         }
       }
     }
+
     if (bestI === -1) break;
-    groups[bestI] = groups[bestI].concat(groups[bestJ]);
-    groups = groups.filter((_group, index) => index !== bestJ);
+
+    const si = order[bestI];
+    const sj = order[bestJ];
+    const oldSizeA = members[si].length;
+    const oldSizeB = members[sj].length;
+    
+    members[si] = members[si].concat(members[sj]);
+    order.splice(bestJ, 1);
+
+    // Lance-Williams update: recompute group-pair similarities with weighted average.
+// Formula: newScore = (oldSizeA * scoreA + oldSizeB * scoreB) / (oldSizeA + oldSizeB)
+// This avoids O(|si| × |sj|) recalculation for each merge.
+    for (let p = 0; p < order.length; p += 1) {
+      const sc = order[p];
+      if (sc === si) continue;
+
+      const scoreA = gs[si * n + sc];
+      const scoreB = gs[sj * n + sc];
+      const newScore = (oldSizeA * scoreA + oldSizeB * scoreB) / members[si].length;
+
+      gs[si * n + sc] = newScore;
+      gs[sc * n + si] = newScore;
+    }
   }
 
-  // Map local indices back to the caller's indices; keep only real clusters.
-  return groups
-    .filter((group) => group.length >= 2)
-    .map((group) => group.map((local) => component[local]));
+  // Extract final clusters: convert living group IDs back to component-global indices.
+  // Filter out singletons (clusters must have ≥2 members to be meaningful).
+  return order
+    .filter((slot) => members[slot].length >= 2)
+    .map((slot) => members[slot].map((local) => component[local]));
 };
 
 /**
@@ -296,38 +375,70 @@ export const findCandidateClusters = (
   functions: ClusterableFunction[],
   options: ClusterOptions = {}
 ): CandidateCluster[] => {
+  const startedAt = performance.now();
+
   const {
     threshold = SIMILARITY_THRESHOLD,
     mergeFloor = MERGE_FLOOR,
     maxClusterSize = MAX_CLUSTER_SIZE,
     maxClusters = MAX_CANDIDATE_CLUSTERS,
-    crossLanguage
+    crossLanguage,
+    onStats
   } = options;
 
   const usable = functions.filter((fn) => fn.embedding.length > 0);
-  if (usable.length < 2) return [];
+  if (usable.length < 2) {
+    onStats?.({ components: 0, largestComponent: 0, pairsComputed: 0, ms: performance.now() - startedAt });
+    return [];
+  }
 
+  const prepared = usable.map(prepareFunction);
   const vectors = usable.map((fn) => normalise(fn.embedding));
 
-  // Compatibility-and-length-aware similarity. Incompatible or unlike-length
-  // pairs are -Infinity so they can never merge.
-  const simOf = (a: number, b: number): number => {
-    if (a === b) return 1;
-    if (!isCompatible(usable[a], usable[b], { crossLanguage })) return -Infinity;
-    if (vectors[a].length !== vectors[b].length) return -Infinity;
-    return dot(vectors[a], vectors[b]);
+// Skip cross-bucket comparisons: different arity or purity cannot be same behaviour.
+  // Memoization: every within-bucket pair is computed once and cached.
+  // simOf reads from pairCache on subsequent calls (Union-Find pass, averageLinkage, meanPairwise).
+  // pairsComputed tracks actual dot product computations for metrics and diagnostics.
+  const pairCache = new Map<number, number>();
+  let pairsComputed = 0;
+
+  const pairKey = (a: number, b: number): number => {
+    const low = Math.min(a, b);
+    const high = Math.max(a, b);
+    return low * usable.length + high;
   };
 
-  // Bucket first: comparing across (arity, purity) buckets is provably wasted.
+  const simOf = (a: number, b: number): number => {
+    if (a === b) return 1;
+
+    const key = pairKey(a, b);
+    if (pairCache.has(key)) return pairCache.get(key) as number;
+
+    // Compatibility-and-length-aware similarity: incompatible or mismatched pairs return -Infinity
+    // so they never merge
+    let score = -Infinity;
+    if (
+      isPreparedCompatible(prepared[a], prepared[b], crossLanguage) &&
+      vectors[a].length === vectors[b].length
+    ) {
+      score = dot(vectors[a], vectors[b]);
+      pairsComputed += 1;
+    }
+
+    pairCache.set(key, score);
+    return score;
+  };
+
   const buckets = new Map<string, number[]>();
   usable.forEach((fn, index) => {
-    const key = `${arityBucket(fn.arity)}:${fn.isPure}`;
+    const key = `${prepared[index].arityBucket}:${fn.isPure}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(index);
     else buckets.set(key, [index]);
   });
 
-  // Union-find over above-floor compatible edges → candidate components.
+  // Build connected components using Union-Find at MERGE_FLOOR threshold.
+  // Single-linkage: one edge ≥ 0.70 joins two functions into the same component.
   const parent = usable.map((_fn, index) => index);
   const find = (x: number): number => {
     let root = x;
@@ -380,6 +491,19 @@ export const findCandidateClusters = (
   // cohesion sort spends the budget on exact copies (which token tools already
   // find) and starves the cross-module Type-4 clones that are the whole point.
   clusters.sort((a, b) => candidatePriority(b) - candidatePriority(a) || b.cohesion - a.cohesion);
+
+  const componentList = [...components.values()];
+  const stats: ClusteringStats = {
+    components: componentList.length,
+    largestComponent: componentList.reduce(
+      (largest, comp) => Math.max(largest, comp.length),
+      0
+    ),
+    pairsComputed,
+    ms: performance.now() - startedAt
+  };
+  onStats?.(stats);
+
   return clusters.slice(0, maxClusters);
 };
 

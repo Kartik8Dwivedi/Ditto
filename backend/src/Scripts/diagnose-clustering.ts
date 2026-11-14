@@ -71,13 +71,20 @@ const main = async (): Promise<void> => {
     }));
 
     const started = Date.now();
-    const clusters = findCandidateClusters(clusterable);
+    let clusteringStats = { components: 0, largestComponent: 0, pairsComputed: 0, ms: 0 };
+    const clusters = findCandidateClusters(clusterable, {
+      onStats: (stats) => {
+        clusteringStats = stats;
+      },
+    });
     const ms = Date.now() - started;
 
     const biggest = clusters.reduce((m, c) => Math.max(m, c.memberIds.length), 0);
     logger.info(
       `NEW clustering: ${clusters.length} candidate clusters (largest ${biggest}) ` +
-        `over ${clusterable.length} functions in ${ms}ms`
+        `over ${clusterable.length} functions in ${ms}ms — ` +
+        `components=${clusteringStats.components} largest=${clusteringStats.largestComponent} ` +
+        `pairs=${clusteringStats.pairsComputed} ms=${clusteringStats.ms.toFixed(1)}`
     );
 
     // Did the four truncateText land together?

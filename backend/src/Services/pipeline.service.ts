@@ -263,9 +263,13 @@ class PipelineService {
     // ---- stage 3: cluster (deterministic, 0 tokens) ----
     await onStage?.('cluster');
     const analysable = saved.filter(isAnalysable);
+    let clusteringStats = { components: 0, largestComponent: 0, pairsComputed: 0, ms: 0 };
     const candidates = findCandidateClusters(analysable.map(toClusterable), {
       ...(candidateCap !== undefined ? { maxClusters: candidateCap } : {}),
       crossLanguage,
+      onStats: (stats) => {
+        clusteringStats = stats;
+      },
     }
     );
     // Guard against over-clustering: a generous threshold buys recall at the
@@ -276,7 +280,9 @@ class PipelineService {
     logger.info(
       `[4/6] clustering: ${candidates.length} candidate clusters ` +
         `(largest ${biggest} members, ${toAdjudicate} functions to adjudicate) ` +
-        `from ${analysable.length} embedded functions — 0 tokens`
+        `from ${analysable.length} embedded functions — 0 tokens — ` +
+        `components=${clusteringStats.components} largest=${clusteringStats.largestComponent} ` +
+        `pairs=${clusteringStats.pairsComputed} ms=${clusteringStats.ms.toFixed(1)}`
     );
 
     // ---- stage 4: adjudicate (flagship, one cluster per call) ----
