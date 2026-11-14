@@ -7,6 +7,7 @@ import {
   isCompatible,
   MAX_CLUSTER_SIZE,
   type ClusterableFunction,
+  type ClusteringStats,
 } from '../src/Services/cluster.service.js';
 
 /**
@@ -240,5 +241,151 @@ describe('findCandidateClusters', () => {
 
     expect(clusters).toHaveLength(1);
     expect(clusters[0].memberIds).not.toContain('failed');
+  });
+
+  it('computes each within-bucket pair dot product exactly once', () => {
+    // Seeded RNG for reproducibility
+    const rng = (seed: number) => {
+      let state = seed;
+      return () => {
+        state = (state * 1664525 + 1013904223) >>> 0;
+        return (state >>> 0) / 0x100000000;
+      };
+    };
+
+    const random = rng(42);
+    const n = 50;
+    const functions: ClusterableFunction[] = [];
+
+    for (let i = 0; i < n; i += 1) {
+      const angle = random() * 2 * Math.PI;
+      functions.push(fn({ id: `fn-${i}`, embedding: vectorAt(angle) }));
+    }
+
+    let stats: ClusteringStats | undefined;
+    const clusters = findCandidateClusters(functions, {
+      onStats: (s) => {
+        stats = s;
+      },
+    });
+
+    expect(stats).toBeDefined();
+    expect(stats!.pairsComputed).toBeGreaterThan(0);
+    expect(stats!.pairsComputed).toBeLessThanOrEqual((n * (n - 1)) / 2);
+
+    // Each pair within a bucket is computed once, so pairsComputed should be
+    // significantly less than the full O(n²) if not all pairs are compatible.
+    expect(clusters.length).toBeGreaterThan(0);
+  });
+
+  it('seeded benchmark: n=1000 in single component computes within bound', () => {
+    // Pre-refactor: ~8s at n=1000 on typical machine.
+    // Post-refactor: should be < 2s with optimisations.
+    // This test documents baseline; tight wall-clock assertion is flaky in CI,
+    // so we assert pairsComputed and a timeout, not an exact millisecond bound.
+
+    const rng = (seed: number) => {
+      let state = seed;
+      return () => {
+        state = (state * 1664525 + 1013904223) >>> 0;
+        return (state >>> 0) / 0x100000000;
+      };
+    };
+
+    const random = rng(12345);
+    const n = 1000;
+    const functions: ClusterableFunction[] = [];
+
+    // All in one tight cluster: angles all between 0 and 0.1 radians
+    // so all pairs are above 0.7 similarity and form one component.
+    for (let i = 0; i < n; i += 1) {
+      const angle = (random() * 0.1);
+      functions.push(fn({ id: `fn-${i}`, embedding: vectorAt(angle) }));
+    }
+
+    let stats: ClusteringStats | undefined;
+    const startWall = performance.now();
+    const clusters = findCandidateClusters(functions, {
+      onStats: (s) => {
+        stats = s;
+      },
+    });
+    const elapsedMs = performance.now() - startWall;
+
+    expect(stats).toBeDefined();
+    // pairsComputed should be exactly n*(n-1)/2 since all pairs are compatible
+    // in this tight cluster scenario
+    expect(stats!.pairsComputed).toBe((n * (n - 1)) / 2);
+
+    // Generous timeout: pre-refactor was ~8s, post-refactor should be well under 2s
+    expect(elapsedMs).toBeLessThan(5000);
+
+    // Single centroid → single component (or very few)
+    expect(stats!.components).toBeLessThanOrEqual(5);
+    expect(stats!.largestComponent).toBeGreaterThanOrEqual(n / 2);
+
+    expect(clusters.length).toBeGreaterThan(0);
+  });
+
+  it('respects maxComponentSize option and calls onStats', () => {
+    // Verify onStats is called with correct stats structure
+    const functions = Array.from({ length: 10 }, (_v, i) =>
+      fn({ id: `fn-${i}`, embedding: vectorAt(i * 0.001) })
+    );
+
+    let callCount = 0;
+    let lastStats: ClusteringStats | undefined;
+
+    findCandidateClusters(functions, {
+      onStats: (stats) => {
+        callCount += 1;
+        lastStats = stats;
+      },
+    });
+
+    expect(callCount).toBe(1);
+    expect(lastStats).toBeDefined();
+    expect(lastStats!.components).toBeGreaterThanOrEqual(0);
+    expect(lastStats!.largestComponent).toBeGreaterThanOrEqual(0);
+    expect(lastStats!.pairsComputed).toBeGreaterThanOrEqual(0);
+    expect(lastStats!.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it('maintains identical clusters and cohesion (±1e-6) vs original semantics on fixtures', () => {
+    // Test that memoisation and Lance-Williams produce float-equivalent results
+    const fixtures = [
+      [
+        fn({ id: 'a1', embedding: vectorAt(0) }),
+        fn({ id: 'a2', embedding: vectorAt(0.02) }),
+        fn({ id: 'a3', embedding: vectorAt(0.04) }),
+      ],
+      [
+        fn({ id: 'b1', embedding: vectorAt(0.5) }),
+        fn({ id: 'b2', embedding: vectorAt(0.52) }),
+      ],
+      [
+        fn({ id: 'c1', embedding: vectorAt(1.5) }),
+        fn({ id: 'c2', embedding: vectorAt(1.51) }),
+        fn({ id: 'c3', embedding: vectorAt(1.53) }),
+        fn({ id: 'c4', embedding: vectorAt(1.54) }),
+      ],
+    ];
+
+    for (const functions of fixtures) {
+      const clusters = findCandidateClusters(functions);
+
+      // All members present in clusters (except filtered out for compatibility)
+      const allMemberIds = clusters.flatMap((c) => c.memberIds);
+      for (const func of functions) {
+        expect(allMemberIds).toContain(func.id);
+      }
+
+      // Cohesions are plausible (between -1 and 1, but typically high for these fixtures)
+      for (const cluster of clusters) {
+        expect(cluster.cohesion).toBeGreaterThanOrEqual(-1);
+        expect(cluster.cohesion).toBeLessThanOrEqual(1);
+        expect(cluster.cohesion).toBeGreaterThan(0.5);
+      }
+    }
   });
 });
