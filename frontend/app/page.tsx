@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import logoDark from '@/public/logo/ditto_dark_bg.png';
+import logoWhite from '@/public/logo/ditto_white_bg.png';
 import { fetchRepo, fetchRepos } from '@/services/ditto.api';
 import { rankRepos, toRanked, type RankedRepo } from '@/lib/repo-ranking';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
@@ -69,8 +72,8 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-4 px-6">
           <Link href="/" className="flex items-center gap-2.5 text-ink hover:opacity-90 transition-opacity duration-150">
-            <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-6 w-auto shrink-0" />
-            <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-6 w-auto shrink-0" />
+            <Image src={logoDark} alt="Ditto Logo" className="logo-dark-theme h-6 w-auto shrink-0" />
+            <Image src={logoWhite} alt="Ditto Logo" className="logo-light-theme h-6 w-auto shrink-0" />
             <span className="rounded bg-inset border border-line px-1.5 py-px font-mono text-[9px] tracking-wider text-ink-subtle uppercase">
               Semantic CI
             </span>
@@ -365,8 +368,8 @@ export default function Home() {
         {/* Footer */}
         <footer className="border-t border-line pt-8 pb-12 flex flex-col sm:flex-row items-center justify-between text-xs text-ink-subtle gap-4">
           <div className="flex items-center gap-2">
-            <img src="/logo/ditto_dark_bg.png" alt="Ditto Logo" className="logo-dark-theme h-4 w-auto shrink-0 opacity-70" />
-            <img src="/logo/ditto_white_bg.png" alt="Ditto Logo" className="logo-light-theme h-4 w-auto shrink-0 opacity-70" />
+            <Image src={logoDark} alt="Ditto Logo" className="logo-dark-theme h-4 w-auto shrink-0 opacity-70" />
+            <Image src={logoWhite} alt="Ditto Logo" className="logo-light-theme h-4 w-auto shrink-0 opacity-70" />
             <span>© {new Date().getFullYear()} Ditto Labs</span>
           </div>
           <div className="flex items-center gap-4 font-mono">
