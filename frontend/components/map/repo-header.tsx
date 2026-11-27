@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import logoDark from '@/public/logo/ditto_dark_bg.png';
+import logoWhite from '@/public/logo/ditto_white_bg.png';
 import { GitBranch } from 'lucide-react';
 import type { RepoDetail, RepoSummary } from '@/types/ditto';
 import { MockDataNotice } from '@/components/ui/mock-data-notice';
@@ -40,16 +43,8 @@ export function RepoHeader({
           href="/"
           className="flex items-center gap-2 text-ink transition-opacity duration-150 hover:opacity-80"
         >
-          <img
-            src="/logo/ditto_dark_bg.png"
-            alt="Ditto Logo"
-            className="logo-dark-theme h-5 w-auto shrink-0"
-          />
-          <img
-            src="/logo/ditto_white_bg.png"
-            alt="Ditto Logo"
-            className="logo-light-theme h-5 w-auto shrink-0"
-          />
+          <Image src={logoDark} alt="Ditto Logo" className="logo-dark-theme h-5 w-auto shrink-0" />
+          <Image src={logoWhite} alt="Ditto Logo" className="logo-light-theme h-5 w-auto shrink-0" />
         </Link>
 
         <span aria-hidden className="h-3.5 w-px bg-line-strong" />
